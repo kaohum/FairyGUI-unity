@@ -7,6 +7,8 @@ namespace FairyGUI
     /// </summary>
     public static class ShaderConfig
     {
+	    public static readonly int ShaderID_RenderType = Shader.PropertyToID("_renderType");
+	    
         /// <summary>
         /// 
         /// </summary>
@@ -27,7 +29,7 @@ namespace FairyGUI
         /// <summary>
         /// 
         /// </summary>
-        public static string textShader = "FairyGUI/Text";
+        public static string textShader = "FairyGUI/Image";
 
         /// <summary>
         /// 
@@ -40,6 +42,7 @@ namespace FairyGUI
         public static string TMPFontShader = "FairyGUI/TMP";
 
         public static int ID_ClipBox;
+        public static int ID_UI_Alpha;
         public static int ID_ClipSoftness;
         public static int ID_AlphaTex;
         public static int ID_StencilComp;
@@ -54,10 +57,12 @@ namespace FairyGUI
         public static int ID_ColorOption;
 
         public static int ID_Stencil2;
+        public static int ID_GrayPhase; // gowrapper use 
 
         static ShaderConfig()
         {
             ID_ClipBox = Shader.PropertyToID("_ClipBox");
+            ID_UI_Alpha = Shader.PropertyToID("_UI_Alpha");
             ID_ClipSoftness = Shader.PropertyToID("_ClipSoftness");
             ID_AlphaTex = Shader.PropertyToID("_AlphaTex");
             ID_StencilComp = Shader.PropertyToID("_StencilComp");
@@ -72,6 +77,7 @@ namespace FairyGUI
             ID_ColorOption = Shader.PropertyToID("_ColorOption");
 
             ID_Stencil2 = Shader.PropertyToID("_StencilRef");
+            ID_GrayPhase = Shader.PropertyToID("_GrayPhase");
         }
 
         /// <summary>
@@ -82,7 +88,7 @@ namespace FairyGUI
         public static Shader GetShader(string name)
         {
             Shader shader = Get(name);
-            if (shader == null)
+            if (!shader)
             {
                 Debug.LogWarning("FairyGUI: shader not found: " + name);
                 shader = Shader.Find("UI/Default");

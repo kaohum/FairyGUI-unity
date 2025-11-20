@@ -1,6 +1,6 @@
-﻿using UnityEngine;
-using UnityEditor;
 using FairyGUI;
+using UnityEngine;
+using UnityEditor;
 
 namespace FairyGUIEditor
 {
@@ -32,6 +32,15 @@ namespace FairyGUIEditor
                 bool fairyBatching = EditorGUILayout.Toggle("FairyBatching", ((Container)obj).fairyBatching);
                 if (EditorGUI.EndChangeCheck())
                     ((Container)obj).fairyBatching = fairyBatching;
+				EditorGUI.BeginChangeCheck();
+				bool forceBatching = EditorGUILayout.Toggle("ForceBatching", ((Container)obj).forceBatching);
+				if (EditorGUI.EndChangeCheck())
+					((Container)obj).forceBatching = forceBatching;
+				EditorGUI.BeginChangeCheck();
+				bool wrapperBatching = EditorGUILayout.Toggle("WrapperBatching", ((Container)obj).wrapperBatching);
+				if (EditorGUI.EndChangeCheck())
+					((Container)obj).wrapperBatching = wrapperBatching;
+				EditorGUILayout.LabelField("numChildren", $"{((Container)obj).numChildren} -- {GetChildrenNum((Container)obj)}");
             }
 
             GObject gObj = obj.gOwner;
@@ -112,6 +121,11 @@ namespace FairyGUIEditor
                     gObj.pivot = pivot;
 
                 EditorGUI.BeginChangeCheck();
+                float alpha = EditorGUILayout.FloatField("Alpha", gObj.alpha);
+                if (EditorGUI.EndChangeCheck())
+                    gObj.alpha = alpha;
+
+                EditorGUI.BeginChangeCheck();
                 string text = EditorGUILayout.TextField("Text", gObj.text);
                 if (EditorGUI.EndChangeCheck())
                     gObj.text = text;
@@ -122,5 +136,19 @@ namespace FairyGUIEditor
                     gObj.icon = icon;
             }
         }
+
+		private static int GetChildrenNum (Container container)
+		{
+			int num = container.numChildren;
+			for (int i = 0; i < container.numChildren; ++i)
+			{
+				var child = container.GetChildAt(i);
+				if (child is Container)
+				{
+					num += GetChildrenNum(child as Container);
+				}
+			}
+			return num;
+		}
     }
 }

@@ -318,6 +318,14 @@ namespace FairyGUI
         }
 
         /// <summary>
+        /// 同时判断自己和父亲是否释放
+        /// </summary>
+        public bool IsDisposed()
+        {
+            return _root == null || _root.disposed;
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         public Texture nativeTexture
@@ -416,6 +424,35 @@ namespace FairyGUI
 
             if (onSizeChanged != null && lastSize != _originalSize)
                 onSizeChanged(this);
+        }
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="nativeTexture"></param>
+        /// <param name="alphaTexture"></param>
+        public void Reload2(Texture nativeTexture, Texture alphaTexture)
+        {
+            if (_root != this)
+                throw new System.Exception("Reload is not allow to call on none root NTexture.");
+
+            if (_nativeTexture != null && _nativeTexture != nativeTexture)
+                DestroyTexture();
+
+            _nativeTexture = nativeTexture;
+            _alphaTexture = alphaTexture;
+
+            // Vector2 lastSize = _originalSize;
+            // if (_nativeTexture != null)
+            //     _originalSize = new Vector2(_nativeTexture.width, _nativeTexture.height);
+            // else
+            //     _originalSize = Vector2.zero;
+            _region = new Rect(0, 0, _originalSize.x, _originalSize.y);
+
+            RefreshMaterials();
+
+            // if (onSizeChanged != null && lastSize != _originalSize)
+            //     onSizeChanged(this);
         }
 
         void DestroyTexture()
@@ -516,6 +553,18 @@ namespace FairyGUI
             _root = null;
             onSizeChanged = null;
             onRelease = null;
+        }
+
+        public void CopyFrom (NTexture other)
+        {
+	        if (other != null)
+	        {
+		        this.uvRect = other.uvRect;
+		        this.rotated = other.rotated;
+		        this._region = other._region;
+		        this._offset = other._offset;
+		        this._originalSize = other._originalSize;   
+	        }
         }
     }
 }

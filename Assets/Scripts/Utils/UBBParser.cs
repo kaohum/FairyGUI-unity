@@ -19,7 +19,7 @@ namespace FairyGUI.Utils
         public int defaultImgWidth = 0;
         public int defaultImgHeight = 0;
 
-        public delegate string TagHandler(string tagName, bool end, string attr);
+        public delegate string TagHandler(string tagName, bool end, string attr, int customKey);
 
         public UBBParser()
         {
@@ -38,7 +38,7 @@ namespace FairyGUI.Utils
             handlers["strike"] = onTag_Simple;
         }
 
-        protected string onTag_URL(string tagName, bool end, string attr)
+        protected string onTag_URL(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
             {
@@ -54,7 +54,7 @@ namespace FairyGUI.Utils
                 return "</a>";
         }
 
-        protected string onTag_IMG(string tagName, bool end, string attr)
+        protected string onTag_IMG(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
             {
@@ -71,12 +71,12 @@ namespace FairyGUI.Utils
                 return null;
         }
 
-        protected string onTag_Simple(string tagName, bool end, string attr)
+        protected string onTag_Simple(string tagName, bool end, string attr, int customKey)
         {
             return end ? ("</" + tagName + ">") : ("<" + tagName + ">");
         }
 
-        protected string onTag_COLOR(string tagName, bool end, string attr)
+        protected string onTag_COLOR(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
                 return "<font color=\"" + attr + "\">";
@@ -84,7 +84,7 @@ namespace FairyGUI.Utils
                 return "</font>";
         }
 
-        protected string onTag_FONT(string tagName, bool end, string attr)
+        protected string onTag_FONT(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
                 return "<font face=\"" + attr + "\">";
@@ -92,7 +92,7 @@ namespace FairyGUI.Utils
                 return "</font>";
         }
 
-        protected string onTag_SIZE(string tagName, bool end, string attr)
+        protected string onTag_SIZE(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
                 return "<font size=\"" + attr + "\">";
@@ -100,7 +100,7 @@ namespace FairyGUI.Utils
                 return "</font>";
         }
 
-        protected string onTag_ALIGN(string tagName, bool end, string attr)
+        protected string onTag_ALIGN(string tagName, bool end, string attr, int customKey)
         {
             if (!end)
                 return "<p align=\"" + attr + "\">";
@@ -139,7 +139,7 @@ namespace FairyGUI.Utils
             return buffer.ToString();
         }
 
-        public string Parse(string text)
+        public string Parse(string text, int customKey = 0)
         {
             _text = text;
             int pos1 = 0, pos2, pos3;
@@ -189,13 +189,13 @@ namespace FairyGUI.Utils
                 tag = tag.ToLower();
                 if (handlers.TryGetValue(tag, out func))
                 {
-                    repl = func(tag, end, attr);
+                    repl = func(tag, end, attr, customKey);
                     if (repl != null)
                         buffer.Append(repl);
                 }
                 else if (defaultTagHandler != null)
                 {
-                    repl = defaultTagHandler(tag, end, attr);
+                    repl = defaultTagHandler(tag, end, attr, customKey);
                     if (repl != null)
                         buffer.Append(repl);
                     else

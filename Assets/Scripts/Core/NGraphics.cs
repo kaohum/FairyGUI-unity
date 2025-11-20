@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using FairyGUI.Utils;
@@ -46,12 +46,29 @@ namespace FairyGUI
         /// </summary>
         public event Action meshModifier;
 
+        /// <summary>
+        /// 支持文本模式
+        /// </summary>
+        public bool ApplyTextMode
+        {
+	        get => _applyText;
+	        set
+	        {
+		        if (_applyText != value)
+		        {
+			        _applyText = value;
+			        UpdateMaterialFlags();
+		        }
+	        }
+        }
+
         NTexture _texture;
         string _shader;
         Material _material;
         int _customMatarial; //0-none, 1-common, 2-support internal mask, 128-owns material
         MaterialManager _manager;
         string[] _shaderKeywords;
+        bool _applyText;
         int _materialFlags;
         IMeshFactory _meshFactory;
 
@@ -94,8 +111,16 @@ namespace FairyGUI
             _color = Color.white;
             _meshFactory = this;
 
-            meshFilter = gameObject.AddComponent<MeshFilter>();
-            meshRenderer = gameObject.AddComponent<MeshRenderer>();
+            meshFilter = gameObject.GetComponent<MeshFilter>();
+            if (!meshFilter)
+            {
+	            meshFilter = gameObject.AddComponent<MeshFilter>();
+            }
+            meshRenderer = gameObject.GetComponent<MeshRenderer>();
+            if (!meshRenderer)
+            {
+	            meshRenderer = gameObject.AddComponent<MeshRenderer>();
+            }
             meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             meshRenderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
             meshRenderer.receiveShadows = false;
@@ -189,7 +214,7 @@ namespace FairyGUI
                         _texture.ReleaseRef();
 
                     _texture = value;
-                    if (_customMatarial != 0 && _material != null)
+                    if (_customMatarial != 0 && !ReferenceEquals(_material, null))
                         _material.mainTexture = _texture != null ? _texture.nativeTexture : null;
                     _meshDirty = true;
                     UpdateManager();
@@ -231,17 +256,17 @@ namespace FairyGUI
         {
             get
             {
-                if (_customMatarial == 0 && _material == null && _manager != null)
+                if (_customMatarial == 0 && ReferenceEquals(_material, null) && _manager != null)
                     _material = _manager.GetMaterial(_materialFlags, blendMode, 0);
                 return _material;
             }
             set
             {
-                if ((_customMatarial & 128) != 0 && _material != null)
+                if ((_customMatarial & 128) != 0 && !ReferenceEquals(_material, null))
                     Object.DestroyImmediate(_material);
 
                 _material = value;
-                if (_material != null)
+                if (!ReferenceEquals(_material, null))
                 {
                     _customMatarial = 1;
                     if (_material.HasProperty(ShaderConfig.ID_Stencil) || _material.HasProperty(ShaderConfig.ID_ClipBox))
@@ -330,13 +355,24 @@ namespace FairyGUI
         {
             if (_customMatarial != 0)
             {
-                if (material != null)
+                if (!ReferenceEquals(material, null))
                     material.shaderKeywords = _shaderKeywords;
             }
             else if (_shaderKeywords != null && _manager != null)
-                _materialFlags = _manager.GetFlagsByKeywords(_shaderKeywords);
+            {
+	            _materialFlags = _manager.GetFlagsByKeywords(_shaderKeywords, _applyText);
+            }
             else
-                _materialFlags = 0;
+            {
+	            if (_applyText)
+	            {
+		            _materialFlags |= (int)MaterialFlags.ApplyText;
+	            }
+	            else
+	            {
+		            _materialFlags = 0;
+	            }
+            }
         }
 
         /// <summary>
@@ -501,15 +537,15 @@ namespace FairyGUI
         /// </summary>
         public void Dispose()
         {
-            if (mesh != null)
+            if (!ReferenceEquals(mesh, null))
             {
-                if (Application.isPlaying)
-                    Object.Destroy(mesh);
-                else
-                    Object.DestroyImmediate(mesh);
+                 if (Application.isPlaying)
+                     Object.Destroy(mesh);
+                 else
+                     Object.DestroyImmediate(mesh);
                 mesh = null;
             }
-            if ((_customMatarial & 128) != 0 && _material != null)
+            if ((_customMatarial & 128) != 0 && !ReferenceEquals(_material, null))
                 Object.DestroyImmediate(_material);
 
             if (_texture != null)
@@ -518,6 +554,7 @@ namespace FairyGUI
                 _texture = null;
             }
 
+            _applyText = false;
             _manager = null;
             _material = null;
             meshRenderer = null;
@@ -541,7 +578,7 @@ namespace FairyGUI
                 _alpha = alpha;
                 UpdateMeshNow();
             }
-            else if (_alpha != alpha)
+            else if (Math.Abs(_alpha - alpha) > 1e-5f)
                 ChangeAlpha(alpha);
 
             if (_propertyBlock != null && _blockUpdated)
@@ -552,7 +589,7 @@ namespace FairyGUI
 
             if (_customMatarial != 0)
             {
-                if ((_customMatarial & 2) != 0 && _material != null)
+                if ((_customMatarial & 2) != 0 && !ReferenceEquals(_material, null))
                     context.ApplyClippingProperties(_material, false);
             }
             else
@@ -589,9 +626,18 @@ namespace FairyGUI
                         else
                             _material = _manager.GetMaterial(matFlags, blendMode, 0);
                     }
-                }
-                else
+                    //debug add by chenbin
+                    /*if (_material == null) {
+                        Debug.LogError("_material = null 111111" + Stage.inst.GetFGUIObjPath( ((DisplayObject)meshFactory)));
+                    }*/
+                } else {
                     _material = null;
+                    //debug add by chenbin
+                    /*var mesh = (DisplayObject) meshFactory;
+                    if ((mesh is Image) && ((mesh as Image).gOwner is GLoader) && !string.IsNullOrEmpty(((mesh as Image).gOwner as GLoader).url)) {
+                        Debug.LogError("_material = null 22222===" + Stage.inst.GetFGUIObjPath( ((DisplayObject)meshFactory)));   
+                    }*/
+                }
 
                 if (!Material.ReferenceEquals(_material, meshRenderer.sharedMaterial))
                     meshRenderer.sharedMaterial = _material;
@@ -602,7 +648,7 @@ namespace FairyGUI
                 if (_maskFlag == 1)
                     _maskFlag = 2;
                 else
-                {
+                { 
                     if (_stencilEraser != null)
                         _stencilEraser.enabled = false;
 

@@ -45,9 +45,13 @@ namespace FairyGUI
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
-        static public BaseFont GetFont(string name)
+        static public BaseFont GetFont(string name, bool isInit = false)
         {
             BaseFont font;
+
+            if (sFontFactory.TryGetValue(name, out font))
+                return font;
+            
             if (name.StartsWith(UIPackage.URL_PREFIX))
             {
                 font = UIPackage.GetItemAssetByURL(name) as BaseFont;
@@ -55,12 +59,9 @@ namespace FairyGUI
                     return font;
             }
 
-            if (sFontFactory.TryGetValue(name, out font))
-                return font;
-
             object asset = Resources.Load(name);
             if (asset == null)
-                asset = Resources.Load("Fonts/" + name);
+                asset = Resources.Load("fonts/" + name);
 
             //Try to use new API in Uinty5 to load
             if (asset == null)
@@ -72,9 +73,17 @@ namespace FairyGUI
                     for (int i = 0; i < cnt; i++)
                         arr[i] = arr[i].Trim();
                     asset = Font.CreateDynamicFontFromOSFont(arr, 16);
+                } else {
+                    if (!isInit) {
+                        #if UNITY_EDITOR
+                        Debug.LogError("不是Init加载的字库，暂时先用Fallback处理了。name=" + name);
+                        #endif
+                        return Fallback(name); //add by chenbin
+                    } else {
+                        asset = Font.CreateDynamicFontFromOSFont(name, 16);
+                    }
                 }
-                else
-                    asset = Font.CreateDynamicFontFromOSFont(name, 16);
+                
             }
 
             if (asset == null)
@@ -85,6 +94,9 @@ namespace FairyGUI
                 font = new DynamicFont();
                 font.name = name;
                 sFontFactory.Add(name, font);
+                if (!isInit) {
+                    Debug.LogError("不是Init加载的字库。name=" + name);
+                }
 
                 ((DynamicFont)font).nativeFont = (Font)asset;
             }
@@ -107,7 +119,7 @@ namespace FairyGUI
 
             return font;
         }
-
+        
         static BaseFont Fallback(string name)
         {
             if (name != UIConfig.defaultFont)
@@ -129,6 +141,9 @@ namespace FairyGUI
             ((DynamicFont)font).nativeFont = asset;
 
             sFontFactory.Add(name, font);
+#if UNITY_EDITOR
+            Debug.LogError("不是Init加载的字库，而是在Fallback处理的。name=" + name);
+#endif
             return font;
         }
 

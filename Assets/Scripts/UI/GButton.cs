@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using FairyGUI.Utils;
 
 namespace FairyGUI
@@ -8,6 +9,10 @@ namespace FairyGUI
     /// </summary>
     public class GButton : GComponent, IColorGear
     {
+
+        ///add by zhongzs
+        public static EventCallback1 HookClick;
+            
         /// <summary>
         /// Play sound when button is clicked.
         /// </summary>
@@ -95,6 +100,37 @@ namespace FairyGUI
             }
         }
 
+        public Color iconColor
+        {
+	        get
+	        {
+		        if (_iconObject != null)
+		        {
+			        if (_iconObject is GImage img)
+			        {
+				        return img.color;
+			        } else if (_iconObject is GLoader loader)
+			        {
+				        return loader.color;
+			        }
+		        }
+		        return Color.white;
+	        }
+	        set
+	        {
+		        if (_iconObject != null)
+		        {
+			        if (_iconObject is GImage img)
+			        {
+				        img.color = value;
+			        } else if (_iconObject is GLoader loader)
+			        {
+				        loader.color = value;
+			        }
+		        }
+	        }
+        }
+        
         /// <summary>
         /// Title of the button
         /// </summary>
@@ -494,6 +530,10 @@ namespace FairyGUI
             displayObject.onTouchEnd.Add(__touchEnd);
             displayObject.onRemovedFromStage.Add(__removedFromStage);
             displayObject.onClick.Add(__click);
+            
+            ///add by zhongzs
+            if (HookClick != null)
+                displayObject.onClick.Add(HookClick);
         }
 
         override public void Setup_AfterAdd(ByteBuffer buffer, int beginPos)
@@ -537,6 +577,8 @@ namespace FairyGUI
                 soundVolumeScale = buffer.ReadFloat();
 
             this.selected = buffer.ReadBool();
+            
+            UIUtils.SetupGradientText(GetTextField(), dataJsonObject);
         }
 
         private void __rollover()

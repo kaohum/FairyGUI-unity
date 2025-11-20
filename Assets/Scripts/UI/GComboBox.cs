@@ -32,7 +32,7 @@ namespace FairyGUI
 
         protected GObject _titleObject;
         protected GObject _iconObject;
-        protected GList _list;
+        public GList _list;
 
         protected List<string> _items;
         protected List<string> _icons;
@@ -281,7 +281,10 @@ namespace FairyGUI
                 {
                     this.text = (string)_items[_selectedIndex];
                     if (_icons != null && _selectedIndex < _icons.Count)
+                    {
                         this.icon = _icons[_selectedIndex];
+                    }
+                    _list.selectedIndex = _selectedIndex;
                 }
                 else
                 {
@@ -437,7 +440,7 @@ namespace FairyGUI
                     return;
                 }
                 _list.onClickItem.Add(__clickItem);
-
+                
                 _list.AddRelation(dropdown, RelationType.Width);
                 _list.RemoveRelation(dropdown, RelationType.Height);
 
@@ -535,8 +538,8 @@ namespace FairyGUI
         protected void ShowDropdown()
         {
             UpdateDropdownList();
-            if (_list.selectionMode == ListSelectionMode.Single)
-                _list.selectedIndex = -1;
+            //if (_list.selectionMode == ListSelectionMode.Single)
+                //_list.selectedIndex = -1;
             dropdown.width = this.width;
             _list.EnsureBoundsCorrect(); //avoid flicker
 
@@ -559,6 +562,8 @@ namespace FairyGUI
                 item.icon = (_icons != null && i < _icons.Count) ? _icons[i] : null;
                 item.name = i < _values.Count ? _values[i] : string.Empty;
             }
+
+            _list.selectedIndex = selectedIndex;
         }
 
         private void __popupWinClosed(object obj)

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using FairyGUI;
@@ -50,7 +50,30 @@ namespace FairyGUIEditor
             Selection.objects = new Object[] { StageCamera.main.gameObject };
         }
 
-        [MenuItem("Window/FairyGUI - Refresh Packages And Panels")]
+		[MenuItem("GameObject/FairyGUI/UI Simulator", false, 0)]
+		static void CreateSimulator ()
+		{
+			EditorApplication.update -= EditorApplication_Update;
+			EditorApplication.update += EditorApplication_Update;
+
+			StageCamera.CheckMainCamera();
+
+			GameObject panelObject = new GameObject("UISimulator");
+			if (Selection.activeGameObject != null)
+			{
+				panelObject.transform.parent = Selection.activeGameObject.transform;
+				panelObject.layer = Selection.activeGameObject.layer;
+			}
+			else
+			{
+				int layer = LayerMask.NameToLayer(StageCamera.LayerName);
+				panelObject.layer = layer;
+			}
+			panelObject.AddComponent<FairyGUI.UISimulator>();
+			Selection.objects = new Object[] { panelObject };
+		}
+
+		[MenuItem("Window/FairyGUI - Refresh Packages And Panels")]
         static void RefreshPanels()
         {
             ReloadPackages();

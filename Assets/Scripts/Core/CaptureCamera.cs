@@ -191,6 +191,7 @@ namespace FairyGUI
             GL.Clear(true, true, Color.clear);
             camera.Render();
             RenderTexture.active = old;
+            camera.targetTexture = null;
 
             if (target.graphics != null)
                 target.graphics.gameObject.layer = oldLayer;

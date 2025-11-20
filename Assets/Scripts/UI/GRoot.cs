@@ -25,6 +25,15 @@ namespace FairyGUI
             get { return UIContentScaler.scaleLevel; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        public EventListener onOrientationChanged
+        {
+            get { return _onOrientationChanged ?? (_onOrientationChanged = new EventListener(this, "onOrientationChanged")); }
+        }
+
+        public bool useModealLayer = false;  //add by chenbin 设置是否使用fgui的档板
         GGraph _modalLayer;
         GObject _modalWaitPane;
         List<GObject> _popupStack;
@@ -32,7 +41,8 @@ namespace FairyGUI
         HashSet<GObject> _specialPopups;
         GObject _tooltipWin;
         GObject _defaultTooltipWin;
-
+        EventListener _onOrientationChanged;
+        
         internal static GRoot _inst;
         public static GRoot inst
         {
@@ -45,6 +55,8 @@ namespace FairyGUI
             }
         }
 
+        public static bool HasInstance => _inst != null;
+        
         public GRoot()
         {
             this.name = this.rootContainer.name = this.rootContainer.gameObject.name = "GRoot";
@@ -64,6 +76,14 @@ namespace FairyGUI
 
             Stage.inst.onTouchBegin.RemoveCapture(__stageTouchBegin);
             Stage.inst.onTouchEnd.RemoveCapture(__stageTouchEnd);
+        }
+
+        public void SetContentScaleMode (UIContentScaler.ScaleMode mode)
+        {
+	        UIContentScaler scaler = Stage.inst.gameObject.GetComponent<UIContentScaler>();
+	        scaler.scaleMode = mode;
+	        scaler.ApplyChange();
+	        ApplyContentScaleFactor();
         }
 
         /// <summary>
@@ -106,13 +126,64 @@ namespace FairyGUI
             ApplyContentScaleFactor();
         }
 
+        public static Rect safeArea // 刘海屏测试
+#if UNITY_EDITOR
+        {
+            get {
+                if (safeAreaOffsetRatio == Vector2.zero) {
+                    return Screen.safeArea;
+                }
+                var ScreenWidth = Screen.width;
+                var ScreenHeight = Screen.height;
+                var sourceWidth = Mathf.CeilToInt((ScreenWidth) / UIContentScaler.scaleFactor);
+                var sourceHeight = Mathf.CeilToInt((ScreenHeight) / UIContentScaler.scaleFactor);
+                var x_left = sourceWidth * safeAreaOffsetRatio.x;
+                var x_right = sourceWidth * safeAreaOffsetRatio.y;
+                return new Rect(x_left, 0, ScreenWidth - (x_left + x_right), ScreenHeight);
+            }
+        }
+#else
+        => Screen.safeArea;
+#endif
+        // 适配刘海后的偏移
+        public static int offset_x;
+        
+#if UNITY_EDITOR
+        public static bool safeAreaDirty = false;
+        public static Vector2  safeAreaOffsetRatio { get; set; }
+#endif
         /// <summary>
         /// This is called after screen size changed.
         /// </summary>
-        public void ApplyContentScaleFactor()
-        {
-            this.SetSize(Mathf.CeilToInt(Stage.inst.width / UIContentScaler.scaleFactor), Mathf.CeilToInt(Stage.inst.height / UIContentScaler.scaleFactor));
-            this.SetScale(UIContentScaler.scaleFactor, UIContentScaler.scaleFactor);
+        public void ApplyContentScaleFactor() {
+            //safeArea = Screen.safeArea;
+            //Debug.Log($"GRoot => ApplyContentScaleFactor 设置缩放 {Screen.orientation}");
+            //Debug.Log($"GRoot => ApplyContentScaleFactor 设置缩放 width = {Screen.width}, safeArea = {safeArea} = {y}");
+            int width, height;
+            var area = safeArea;
+            
+            var ScreenWidth = Screen.width;
+            var ScreenHeight = Screen.height;
+            // 适配刘海屏
+            switch (Screen.orientation) {
+                case ScreenOrientation.LandscapeLeft:
+                case ScreenOrientation.LandscapeRight:
+                default:
+                    offset_x = (int) area.x;
+                    this.SetXY(offset_x, 0);
+                    //Debug.Log($"GRoot => ApplyContentScaleFactor 设置缩放 ");
+                    width = Mathf.CeilToInt((area.width) / UIContentScaler.scaleFactor);
+                    height = Mathf.CeilToInt(area.height / UIContentScaler.scaleFactor);
+                    this.SetSize(width, height);
+                    this.sourceWidth = Mathf.CeilToInt((ScreenWidth) / UIContentScaler.scaleFactor);
+                    this.sourceHeight = Mathf.CeilToInt((ScreenHeight) / UIContentScaler.scaleFactor);
+                    this.SetScale(UIContentScaler.scaleFactor, UIContentScaler.scaleFactor);
+#if UNITY_EDITOR || ENABLE_LOG
+                    Debug.Log($"GRoot => ApplyContentScaleFactor 设置缩放1 Screen.orientation = {Screen.orientation}, UIContentScaler.scaleFactor = {UIContentScaler.scaleFactor}, GRoot.x = {offset_x}, GRoot.y = {y}, safeWidth = {area.width}, safeHeight = {area.height}, width = {width}, height = {height}, sourceWidth = {sourceWidth}, sourceHeight = {sourceHeight}");
+#endif
+                    break;
+            }
+            
         }
 
         /// <summary>
@@ -169,7 +240,8 @@ namespace FairyGUI
         {
             int cnt = this.numChildren;
             int i;
-            if (_modalLayer != null && _modalLayer.parent != null && !win.modal)
+
+            if (useModealLayer && _modalLayer?.parent != null && !win.modal)
                 i = GetChildIndex(_modalLayer) - 1;
             else
                 i = cnt - 1;
@@ -290,7 +362,7 @@ namespace FairyGUI
         /// </summary>
         public bool hasModalWindow
         {
-            get { return _modalLayer != null && _modalLayer.parent != null; }
+            get { return useModealLayer && _modalLayer != null && _modalLayer.parent != null; }
         }
 
         /// <summary>
@@ -334,6 +406,7 @@ namespace FairyGUI
 
         private void AdjustModalLayer()
         {
+            if (!useModealLayer) return;
             if (_modalLayer == null || _modalLayer.isDisposed)
                 CreateModalLayer();
 
@@ -652,16 +725,18 @@ namespace FairyGUI
         }
 
         /// <summary>
-        /// 
+        /// 显示Tooltips
         /// </summary>
         /// <param name="tooltipWin"></param>
         public void ShowTooltipsWin(GObject tooltipWin)
         {
-            ShowTooltipsWin(tooltipWin, 0.1f);
+            HideTooltips();
+            _tooltipWin = tooltipWin;
+            AddChild(_tooltipWin);
         }
 
         /// <summary>
-        /// 
+        /// 在点击位置显示Tooltips
         /// </summary>
         /// <param name="tooltipWin"></param>
         /// <param name="delay"></param>
@@ -738,7 +813,12 @@ namespace FairyGUI
         void __stageTouchBegin(EventContext context)
         {
             if (_tooltipWin != null)
-                HideTooltips();
+            {
+                if (!_tooltipWin.IsContainsGlobalPoint(context.inputEvent.position))
+                {
+                    HideTooltips();
+                }
+            }
 
             CheckPopups(true);
         }

@@ -13,7 +13,8 @@ namespace FairyGUI
         StencilTest = 4,
         AlphaMask = 8,
         Grayed = 16,
-        ColorFilter = 32
+        ColorFilter = 32,
+        ApplyText = 64,
     }
 
     /// <summary>
@@ -39,8 +40,8 @@ namespace FairyGUI
             public uint group;
         }
 
-        const int internalKeywordsCount = 6;
-        static string[] internalKeywords = new[] { "CLIPPED", "SOFT_CLIPPED", null, "ALPHA_MASK", "GRAYED", "COLOR_FILTER" };
+        const int internalKeywordsCount = 7;
+        static string[] internalKeywords = new[] { "CLIPPED", "SOFT_CLIPPED", null, "ALPHA_MASK", "GRAYED", "COLOR_FILTER", null };
 
         /// <summary>
         /// 
@@ -60,7 +61,7 @@ namespace FairyGUI
         /// </summary>
         /// <param name="keywords"></param>
         /// <returns></returns>
-        public int GetFlagsByKeywords(IList<string> keywords)
+        public int GetFlagsByKeywords(IList<string> keywords, bool applyText)
         {
             if (_addKeywords == null)
                 _addKeywords = new List<string>();
@@ -80,6 +81,11 @@ namespace FairyGUI
                 flags += (1 << (j + internalKeywordsCount));
             }
 
+            if (applyText)
+            {
+	            flags |= (int)MaterialFlags.ApplyText;
+            }
+            
             return flags;
         }
 
@@ -122,6 +128,8 @@ namespace FairyGUI
                     if (_combineTexture)
                         item.material.SetTexture(ShaderConfig.ID_AlphaTex, _texture.alphaTexture);
 
+#if UNITY_EDITOR
+#endif
                     return item.material;
                 }
                 else if (result == null && (item.frame > frameId || item.frame < frameId - 1)) //collect materials if it is unused in last frame
@@ -145,6 +153,8 @@ namespace FairyGUI
             result.group = group;
             result.frame = frameId;
             firstMaterialInFrame = true;
+#if UNITY_EDITOR
+#endif
             return result.material;
         }
 

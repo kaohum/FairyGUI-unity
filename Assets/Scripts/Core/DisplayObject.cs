@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using UnityEngine;
 using FairyGUI.Utils;
@@ -226,17 +226,10 @@ namespace FairyGUI
 
         }
 
-        protected void CreateGameObject(string gameObjectName)
+        protected void CreateGameObject<T>(string gameObjectName)
         {
-            gameObject = new GameObject(gameObjectName);
+            gameObject = DisplayObjectPool<T>.Instance.Get(gameObjectName, this);
             cachedTransform = gameObject.transform;
-            if (Application.isPlaying)
-            {
-                UnityEngine.Object.DontDestroyOnLoad(gameObject);
-
-                DisplayObjectInfo info = gameObject.AddComponent<DisplayObjectInfo>();
-                info.displayObject = this;
-            }
             gameObject.hideFlags = DisplayObject.hideFlags;
             gameObject.SetActive(false);
         }
@@ -250,14 +243,11 @@ namespace FairyGUI
             _flags |= Flags.UserGameObject;
         }
 
-        protected void DestroyGameObject()
+        protected void DestroyGameObject<T>()
         {
             if ((_flags & Flags.UserGameObject) == 0 && gameObject != null)
             {
-                if (Application.isPlaying)
-                    GameObject.Destroy(gameObject);
-                else
-                    GameObject.DestroyImmediate(gameObject);
+                DisplayObjectPool<T>.Instance.Recycle(gameObject);
                 gameObject = null;
                 cachedTransform = null;
             }
@@ -846,6 +836,11 @@ namespace FairyGUI
                     graphics.material = value;
             }
         }
+
+		/// <summary>
+		/// DoFairyBatching时的缓存对象，其他地方不要使用！！！
+		/// </summary>
+		protected internal Material _material;
 
         /// <summary>
         /// 
@@ -1778,6 +1773,7 @@ namespace FairyGUI
                 return;
 
             _flags |= Flags.Disposed;
+			_material = null;
             RemoveFromParent();
             RemoveEventListeners();
             if (graphics != null)
@@ -1798,7 +1794,12 @@ namespace FairyGUI
                         UnityEngine.Object.DestroyImmediate(paintingGraphics.gameObject);
                 }
             }
-            DestroyGameObject();
+            OnDestroyGameObject();
+        }
+
+        protected virtual void OnDestroyGameObject()
+        {
+            // sub class override
         }
 
         internal void DisplayDisposedWarning()
@@ -1854,7 +1855,9 @@ namespace FairyGUI
             SkipBatching = 0x10000,
             CacheAsBitmap = 0x20000,
             GameObjectDisposed = 0x40000,
-            DisposedWarning = 0x80000
+            DisposedWarning = 0x80000,
+			ForceBatching = 0x100000, // 是否强制合批。
+			WrapperBatching = 0x200000, // 对GoWrapper进行合批。
         }
     }
 

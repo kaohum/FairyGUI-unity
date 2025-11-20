@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using FairyGUI.Utils;
 #if UNITY_EDITOR
@@ -54,7 +55,7 @@ namespace FairyGUI
         /// <param name="type">Resource type. e.g. 'Texture' 'AudioClip'</param>
         /// <param name="item">Resource item object.</param>
         /// <returns></returns>
-        public delegate void LoadResourceAsync(string name, string extension, System.Type type, PackageItem item);
+        public delegate UniTask LoadResourceAsync(string name, string extension, System.Type type, PackageItem item);
 
         /// <summary>
         /// 
@@ -94,6 +95,7 @@ namespace FairyGUI
         internal static int _constructing;
 
         public const string URL_PREFIX = "ui://";
+        public static System.Func<string, string> GetUISubModel;
 
 #if UNITY_EDITOR
         static LoadResource _loadFromAssetsPath = (string name, string extension, System.Type type, out DestroyMethod destroyMethod) =>
@@ -186,6 +188,10 @@ namespace FairyGUI
         /// <returns>UIPackage</returns>
         public static UIPackage GetByName(string name)
         {
+	        if (!name.Contains("."))
+	        {
+		        name = $"{name}.ui"; //add by chenbin
+	        }
             UIPackage pkg;
             if (_packageInstByName.TryGetValue(name, out pkg))
                 return pkg;
@@ -311,8 +317,10 @@ namespace FairyGUI
             {
                 if (Application.isPlaying)
                     throw new Exception("FairyGUI: Cannot load ui package in '" + assetPath + "'");
-                else
+                else {
                     Debug.LogWarning("FairyGUI: Cannot load ui package in '" + assetPath + "'");
+                    return null;
+                }
             }
 
             ByteBuffer buffer = new ByteBuffer(asset.bytes);
@@ -435,9 +443,11 @@ namespace FairyGUI
         public static GObject CreateObject(string pkgName, string resName)
         {
             UIPackage pkg = GetByName(pkgName);
-            if (pkg != null)
-                return pkg.CreateObject(resName);
-            else
+            if (pkg != null) {
+                var obj = pkg.CreateObject (resName);
+                obj.name = resName;
+                return obj;
+            } else
                 return null;
         }
 
@@ -465,10 +475,26 @@ namespace FairyGUI
         public static GObject CreateObjectFromURL(string url)
         {
             PackageItem pi = GetItemByURL(url);
-            if (pi != null)
-                return pi.owner.CreateObject(pi, null);
+            if (pi != null) {
+                var obj = pi.owner.CreateObject(pi, null);
+                obj.name = pi.name;
+                return obj;
+            }
             else
                 return null;
+        }
+
+        public static bool CreateObjectsFromURL (string url, int count, ref List<GObject> components) {
+            PackageItem pi = GetItemByURL(url);
+            if (pi != null) {
+                for (int i = 0; i < count; i++) {
+                    var obj = pi.owner.CreateObject(pi, null);
+                    obj.name = pi.name;
+                    components.Add(obj);   
+                }
+                return true;
+            } else
+                return false;
         }
 
         /// <summary>
@@ -549,12 +575,16 @@ namespace FairyGUI
             if (!pkg._itemsByName.TryGetValue(resName, out pi))
                 return null;
 
-            return URL_PREFIX + pkg.id + pi.id;
+            return $"{URL_PREFIX}{pkg.id}{pi.id}";
         }
 
-        public static PackageItem GetItemByURL(string url)
+        public static PackageItem GetItemByURL (string url)
         {
-            if (url == null)
+	        return _GetItemByURL(url, false);
+        }
+        private static PackageItem _GetItemByURL (string url, bool isSub)
+        {
+			if (url == null)
                 return null;
 
             int pos1 = url.IndexOf("//");
@@ -577,13 +607,65 @@ namespace FairyGUI
             }
             else
             {
-                string pkgName = url.Substring(pos1 + 2, pos2 - pos1 - 2);
+	            //modify by chenbin
+	            string pkgName, prjName; 
+	            var urlContent = url.Substring(pos1 + 2);
+	            var strs = urlContent.Split('/');
+	            if (strs.Length < 3)
+	            {
+		            prjName = "ui";
+		            pkgName = strs[0];
+#if UNITY_EDITOR
+		            if (!pkgName.Contains("."))
+		            {
+			            Debug.LogWarning("UI url 错误,未配置工程路径：" + url);    
+		            }
+#endif
+	            }
+	            else
+	            {
+		            prjName = strs[0];
+		            pkgName = strs[1];
+	            }
+	            if (!pkgName.Contains("."))
+	            {
+		            pkgName = $"{pkgName}.{prjName}";    
+	            }
+	            
                 UIPackage pkg = GetByName(pkgName);
                 if (pkg != null)
                 {
                     string srcName = url.Substring(pos2 + 1);
-                    return pkg.GetItemByName(srcName);
+                    if (string.IsNullOrEmpty(srcName))
+                    {
+	                    return null;
+                    }
+                    var item = pkg.GetItemByName(srcName);
+                    if (GetUISubModel != null && item == null && !isSub)
+                    {
+	                    // 如果没有，则查找sub节点
+	                    // 解释：sub节点是指
+	                    // UI与UI2共用Icon，当ui的icon找不到时会向ui2的icon去查找
+	                    var subPkgName = GetUISubModel.Invoke(pkgName);
+	                    if (!string.IsNullOrEmpty(subPkgName))
+	                    {
+		                    return _GetItemByURL($"ui://{subPkgName}/{srcName}", !isSub);
+	                    }
+                    }
+#if UNITY_EDITOR
+                    if (isSub && item == null)
+                    {
+	                    Debug.LogError($"Get PackageItem is null.{url}");
+                    }
+#endif
+                    return item;
                 }
+#if UNITY_EDITOR
+                else
+                {
+	                Debug.LogError("Get UIPackage is null. url=" + url);
+                }
+#endif
             }
 
             return null;
@@ -664,6 +746,38 @@ namespace FairyGUI
             get { return _dependencies; }
         }
 
+        /// <summary>
+        /// 为了支持多个UI工程
+        /// </summary>
+        /// <param name="assetNamePrefix"></param>
+        /// <returns></returns>
+        private void GetProjectName (string assetNamePrefix, out string projectName, out string realAssetNamePrefix)
+        {
+	        projectName = string.Empty;
+	        realAssetNamePrefix = string.Empty;
+	        if (assetNamePrefix.Contains("."))
+	        {
+		        var strList = assetNamePrefix.Split('.');
+		        projectName = strList[strList.Length - 1];
+		        realAssetNamePrefix = assetNamePrefix.Substring(0, assetNamePrefix.Length - projectName.Length - 1);
+		        realAssetNamePrefix = $"{projectName}/{realAssetNamePrefix}";
+	        }
+	        else
+	        {
+		        var strList = assetNamePrefix.Split('/');
+		        if (strList.Length > 1)
+		        {
+			        projectName = strList[strList.Length - 2];
+			        realAssetNamePrefix = assetNamePrefix;
+		        }
+		        else
+		        {
+			        projectName = assetNamePrefix;
+			        realAssetNamePrefix = assetNamePrefix;
+		        }
+	        }
+        }
+        
         bool LoadPackage(ByteBuffer buffer, string assetNamePrefix)
         {
             if (buffer.ReadUint() != 0x46475549)
@@ -681,7 +795,9 @@ namespace FairyGUI
             bool ver2 = buffer.version >= 2;
             buffer.ReadBool(); //compressed
             id = buffer.ReadString();
-            name = buffer.ReadString();
+            
+            GetProjectName(assetNamePrefix, out var projectName, out var realAssetNamePrefix); //add by chenbin
+            name = $"{buffer.ReadString()}.{projectName}"; //add by chenbin
 
             UIPackage existingPkg;
             if (_packageInstById.TryGetValue(id, out existingPkg))
@@ -735,7 +851,7 @@ namespace FairyGUI
             {
                 Dictionary<string, string> kv = new Dictionary<string, string>();
                 kv.Add("id", buffer.ReadS());
-                kv.Add("name", buffer.ReadS());
+                kv.Add("name", $"{buffer.ReadS()}.{projectName}"); //add by chenbin
                 _dependencies[i] = kv;
             }
 
@@ -757,12 +873,12 @@ namespace FairyGUI
 
             PackageItem pi;
             string assetPath;
-            if (assetNamePrefix.Length > 0)
+            if (realAssetNamePrefix.Length > 0)
             {
-                assetPath = Path.GetDirectoryName(assetNamePrefix);
+                assetPath = Path.GetDirectoryName(realAssetNamePrefix);
                 if (assetPath.Length > 0)
                     assetPath += "/";
-                assetNamePrefix = assetNamePrefix + "_";
+                realAssetNamePrefix = realAssetNamePrefix + "_";
             }
             else
                 assetPath = string.Empty;
@@ -839,7 +955,7 @@ namespace FairyGUI
                     case PackageItemType.Sound:
                     case PackageItemType.Misc:
                         {
-                            pi.file = assetNamePrefix + pi.file;
+                            pi.file = realAssetNamePrefix + pi.file;
                             break;
                         }
 
@@ -1176,7 +1292,7 @@ namespace FairyGUI
             switch (item.type)
             {
                 case PackageItemType.Image:
-                    if (item.texture == null)
+                    if (item.texture == null || item.texture.IsDisposed())
                         LoadImage(item);
                     return item.texture;
 
@@ -1191,13 +1307,13 @@ namespace FairyGUI
                     return item.audioClip;
 
                 case PackageItemType.Font:
-                    if (item.bitmapFont == null)
+                    if (item.bitmapFont == null || item.bitmapFont.mainTexture == null || item.bitmapFont.mainTexture.IsDisposed())
                         LoadFont(item);
 
                     return item.bitmapFont;
 
                 case PackageItemType.MovieClip:
-                    if (item.frames == null)
+                    if (item.frames == null || (item.frames.Length > 0 && item.frames[0].texture.IsDisposed()))
                         LoadMovieClip(item);
 
                     return item.frames;
@@ -1222,6 +1338,39 @@ namespace FairyGUI
                     return null;
             }
         }
+        
+        public void ReleaseItemAsset(PackageItem item)
+        {
+            switch (item.type)
+            {
+                case PackageItemType.Image:
+                case PackageItemType.Atlas:
+                    if (item.texture != null) {
+                        item.texture.Dispose();
+                        item.texture = null;
+                    }
+                    break;
+                case PackageItemType.Sound:
+                    if (item.audioClip == null) {
+                        item.audioClip.Unload();
+                        item.audioClip = null;
+                    }
+                    break;
+                case PackageItemType.Font:
+                    if (item.bitmapFont == null) {
+                        item.bitmapFont.Dispose();
+                        item.bitmapFont = null;
+                    }
+                    break;
+                case PackageItemType.MovieClip:
+                case PackageItemType.Component:
+                case PackageItemType.Misc:
+                case PackageItemType.Spine:
+                case PackageItemType.DragoneBones:
+                default:
+                    break;
+            }
+        }
 
         /// <summary>
         /// 
@@ -1236,7 +1385,7 @@ namespace FairyGUI
                 case PackageItemType.Atlas:
                     if (item.texture == null)
                         item.texture = new NTexture(null, new Rect(0, 0, item.width, item.height));
-                    item.texture.Reload((Texture)asset, null);
+                    item.texture.Reload2((Texture)asset, null);
                     item.texture.destroyMethod = destroyMethod;
                     break;
 
@@ -1272,6 +1421,10 @@ namespace FairyGUI
                 if (item.texture == null)
                     item.texture = new NTexture(null, new Rect(0, 0, item.width, item.height));
                 item.texture.destroyMethod = DestroyMethod.None;
+                item.texture.onRelease += (t) => {
+                    if (onReleaseResource != null)
+                        onReleaseResource(item);
+                };
             }
             else
             {
@@ -1462,141 +1615,186 @@ namespace FairyGUI
 
         void LoadFont(PackageItem item)
         {
-            BitmapFont font = new BitmapFont();
-            font.name = URL_PREFIX + this.id + item.id;
-            item.bitmapFont = font;
-            ByteBuffer buffer = item.rawData;
+            if (item.bitmapFont == null) {
+                BitmapFont font = new BitmapFont();
+                font.name = URL_PREFIX + this.id + item.id;
+                item.bitmapFont = font;
+                ByteBuffer buffer = item.rawData;
+                buffer.Seek(0, 0);
 
-            buffer.Seek(0, 0);
+                bool ttf = buffer.ReadBool();
+                font.canTint = buffer.ReadBool();
+                font.resizable = buffer.ReadBool();
+                font.hasChannel = buffer.ReadBool();
+                int fontSize = buffer.ReadInt();
+                int xadvance = buffer.ReadInt();
+                int lineHeight = buffer.ReadInt();
 
-            bool ttf = buffer.ReadBool();
-            font.canTint = buffer.ReadBool();
-            font.resizable = buffer.ReadBool();
-            font.hasChannel = buffer.ReadBool();
-            int fontSize = buffer.ReadInt();
-            int xadvance = buffer.ReadInt();
-            int lineHeight = buffer.ReadInt();
+                float texScaleX = 1;
+                float texScaleY = 1;
+                int bgX;
+                int bgY;
+                int bgWidth;
+                int bgHeight;
 
-            float texScaleX = 1;
-            float texScaleY = 1;
-            int bgX;
-            int bgY;
-            int bgWidth;
-            int bgHeight;
-
-            NTexture mainTexture = null;
-            AtlasSprite mainSprite = null;
-            if (ttf && _sprites.TryGetValue(item.id, out mainSprite))
-            {
-                mainTexture = (NTexture)GetItemAsset(mainSprite.atlas);
-                texScaleX = mainTexture.root.uvRect.width / mainTexture.width;
-                texScaleY = mainTexture.root.uvRect.height / mainTexture.height;
-            }
-
-            buffer.Seek(0, 1);
-
-            BitmapFont.BMGlyph bg;
-            int cnt = buffer.ReadInt();
-            for (int i = 0; i < cnt; i++)
-            {
-                int nextPos = buffer.ReadShort();
-                nextPos += buffer.position;
-
-                bg = new BitmapFont.BMGlyph();
-                char ch = buffer.ReadChar();
-                font.AddChar(ch, bg);
-
-                string img = buffer.ReadS();
-                int bx = buffer.ReadInt();
-                int by = buffer.ReadInt();
-                bgX = buffer.ReadInt();
-                bgY = buffer.ReadInt();
-                bgWidth = buffer.ReadInt();
-                bgHeight = buffer.ReadInt();
-                bg.advance = buffer.ReadInt();
-                bg.channel = buffer.ReadByte();
-                //The texture channel where the character image is found (1 = blue, 2 = green, 4 = red, 8 = alpha, 15-all).
-                if (bg.channel == 1)
-                    bg.channel = 2;
-                else if (bg.channel == 2)
-                    bg.channel = 1;
-                else if (bg.channel == 4)
-                    bg.channel = 0;
-                else if (bg.channel == 8)
-                    bg.channel = 3;
-
-                if (ttf)
+                NTexture mainTexture = null;
+                AtlasSprite mainSprite = null;
+                if (ttf && _sprites.TryGetValue(item.id, out mainSprite))
                 {
-                    if (mainSprite.rotated)
+                    mainTexture = (NTexture)GetItemAsset(mainSprite.atlas);
+                    texScaleX = mainTexture.root.uvRect.width / mainTexture.width;
+                    texScaleY = mainTexture.root.uvRect.height / mainTexture.height;
+                }
+
+                buffer.Seek(0, 1);
+
+                BitmapFont.BMGlyph bg;
+                int cnt = buffer.ReadInt();
+                for (int i = 0; i < cnt; i++)
+                {
+                    int nextPos = buffer.ReadShort();
+                    nextPos += buffer.position;
+
+                    bg = new BitmapFont.BMGlyph();
+                    char ch = buffer.ReadChar();
+                    font.AddChar(ch, bg);
+
+                    string img = buffer.ReadS();
+                    int bx = buffer.ReadInt();
+                    int by = buffer.ReadInt();
+                    bgX = buffer.ReadInt();
+                    bgY = buffer.ReadInt();
+                    bgWidth = buffer.ReadInt();
+                    bgHeight = buffer.ReadInt();
+                    bg.advance = buffer.ReadInt();
+                    bg.channel = buffer.ReadByte();
+                    //The texture channel where the character image is found (1 = blue, 2 = green, 4 = red, 8 = alpha, 15-all).
+                    if (bg.channel == 1)
+                        bg.channel = 2;
+                    else if (bg.channel == 2)
+                        bg.channel = 1;
+                    else if (bg.channel == 4)
+                        bg.channel = 0;
+                    else if (bg.channel == 8)
+                        bg.channel = 3;
+
+                    if (ttf)
                     {
-                        bg.uv[0] = new Vector2((float)(by + bgHeight + mainSprite.rect.x) * texScaleX,
-                            1 - (float)(mainSprite.rect.yMax - bx) * texScaleY);
-                        bg.uv[1] = new Vector2(bg.uv[0].x - (float)bgHeight * texScaleX, bg.uv[0].y);
-                        bg.uv[2] = new Vector2(bg.uv[1].x, bg.uv[0].y + (float)bgWidth * texScaleY);
-                        bg.uv[3] = new Vector2(bg.uv[0].x, bg.uv[2].y);
+                        if (mainSprite.rotated)
+                        {
+                            bg.uv[0] = new Vector2((float)(by + bgHeight + mainSprite.rect.x) * texScaleX,
+                                1 - (float)(mainSprite.rect.yMax - bx) * texScaleY);
+                            bg.uv[1] = new Vector2(bg.uv[0].x - (float)bgHeight * texScaleX, bg.uv[0].y);
+                            bg.uv[2] = new Vector2(bg.uv[1].x, bg.uv[0].y + (float)bgWidth * texScaleY);
+                            bg.uv[3] = new Vector2(bg.uv[0].x, bg.uv[2].y);
+                        }
+                        else
+                        {
+                            bg.uv[0] = new Vector2((float)(bx + mainSprite.rect.x) * texScaleX,
+                                1 - (float)(by + bgHeight + mainSprite.rect.y) * texScaleY);
+                            bg.uv[1] = new Vector2(bg.uv[0].x, bg.uv[0].y + (float)bgHeight * texScaleY);
+                            bg.uv[2] = new Vector2(bg.uv[0].x + (float)bgWidth * texScaleX, bg.uv[1].y);
+                            bg.uv[3] = new Vector2(bg.uv[2].x, bg.uv[0].y);
+                        }
+
+                        bg.lineHeight = lineHeight;
+                        bg.x = bgX;
+                        bg.y = bgY;
+                        bg.width = bgWidth;
+                        bg.height = bgHeight;
                     }
                     else
                     {
-                        bg.uv[0] = new Vector2((float)(bx + mainSprite.rect.x) * texScaleX,
-                            1 - (float)(by + bgHeight + mainSprite.rect.y) * texScaleY);
-                        bg.uv[1] = new Vector2(bg.uv[0].x, bg.uv[0].y + (float)bgHeight * texScaleY);
-                        bg.uv[2] = new Vector2(bg.uv[0].x + (float)bgWidth * texScaleX, bg.uv[1].y);
-                        bg.uv[3] = new Vector2(bg.uv[2].x, bg.uv[0].y);
+                        PackageItem charImg;
+                        if (_itemsById.TryGetValue(img, out charImg))
+                        {
+                            charImg = charImg.getBranch();
+                            bgWidth = charImg.width;
+                            bgHeight = charImg.height;
+                            charImg = charImg.getHighResolution();
+                            GetItemAsset(charImg);
+                            charImg.texture.GetUV(bg.uv);
+
+                            texScaleX = (float)bgWidth / charImg.width;
+                            texScaleY = (float)bgHeight / charImg.height;
+
+                            bg.x = bgX + charImg.texture.offset.x * texScaleX;
+                            bg.y = bgY + charImg.texture.offset.y * texScaleY;
+                            bg.width = charImg.texture.width * texScaleX;
+                            bg.height = charImg.texture.height * texScaleY;
+
+                            if (mainTexture == null)
+                                mainTexture = charImg.texture.root;
+                        }
+
+                        if (fontSize == 0)
+                            fontSize = bgHeight;
+
+                        if (bg.advance == 0)
+                        {
+                            if (xadvance == 0)
+                                bg.advance = bgX + bgWidth;
+                            else
+                                bg.advance = xadvance;
+                        }
+
+                        bg.lineHeight = bgY < 0 ? bgHeight : (bgY + bgHeight);
+                        if (bg.lineHeight < fontSize)
+                            bg.lineHeight = fontSize;
                     }
 
-                    bg.lineHeight = lineHeight;
-                    bg.x = bgX;
-                    bg.y = bgY;
-                    bg.width = bgWidth;
-                    bg.height = bgHeight;
+                    buffer.position = nextPos;
                 }
-                else
+
+                font.size = fontSize;
+                font.mainTexture = mainTexture;
+                if (!font.hasChannel)
+                    font.shader = ShaderConfig.imageShader;
+            } else {
+                ByteBuffer buffer = item.rawData;
+                buffer.Seek(0, 0);
+
+                bool ttf = buffer.ReadBool();
+                
+                NTexture mainTexture = null;
+                AtlasSprite mainSprite = null;
+                if (ttf && _sprites.TryGetValue(item.id, out mainSprite))
                 {
-                    PackageItem charImg;
-                    if (_itemsById.TryGetValue(img, out charImg))
-                    {
-                        charImg = charImg.getBranch();
-                        bgWidth = charImg.width;
-                        bgHeight = charImg.height;
-                        charImg = charImg.getHighResolution();
-                        GetItemAsset(charImg);
-                        charImg.texture.GetUV(bg.uv);
-
-                        texScaleX = (float)bgWidth / charImg.width;
-                        texScaleY = (float)bgHeight / charImg.height;
-
-                        bg.x = bgX + charImg.texture.offset.x * texScaleX;
-                        bg.y = bgY + charImg.texture.offset.y * texScaleY;
-                        bg.width = charImg.texture.width * texScaleX;
-                        bg.height = charImg.texture.height * texScaleY;
-
-                        if (mainTexture == null)
-                            mainTexture = charImg.texture.root;
-                    }
-
-                    if (fontSize == 0)
-                        fontSize = bgHeight;
-
-                    if (bg.advance == 0)
-                    {
-                        if (xadvance == 0)
-                            bg.advance = bgX + bgWidth;
-                        else
-                            bg.advance = xadvance;
-                    }
-
-                    bg.lineHeight = bgY < 0 ? bgHeight : (bgY + bgHeight);
-                    if (bg.lineHeight < fontSize)
-                        bg.lineHeight = fontSize;
+                    mainTexture = (NTexture)GetItemAsset(mainSprite.atlas);
                 }
 
-                buffer.position = nextPos;
-            }
+                if (!ttf) {
+                    buffer.Seek(0, 1);
 
-            font.size = fontSize;
-            font.mainTexture = mainTexture;
-            if (!font.hasChannel)
-                font.shader = ShaderConfig.imageShader;
+                    int cnt = buffer.ReadInt();
+                    for (int i = 0; i < cnt; i++) {
+                        int nextPos = buffer.ReadShort();
+                        nextPos += buffer.position;
+
+                        char ch = buffer.ReadChar();
+                        //font.AddChar(ch, bg);
+
+                        string img = buffer.ReadS();
+                        int bx = buffer.ReadInt();
+                        int by = buffer.ReadInt();
+                        var bgX = buffer.ReadInt();
+                        var bgY = buffer.ReadInt();
+                        var bgWidth = buffer.ReadInt();
+                        var bgHeight = buffer.ReadInt();
+                        var advance = buffer.ReadInt();
+                        var channel = buffer.ReadByte();
+
+                        PackageItem charImg;
+                        if (_itemsById.TryGetValue(img, out charImg)) {
+                            GetItemAsset(charImg);
+                            mainTexture = charImg.texture.root;
+                            break;
+                        }
+                    }
+                }
+                
+                item.bitmapFont.mainTexture = mainTexture;
+            }
         }
 
         void LoadSpine(PackageItem item)

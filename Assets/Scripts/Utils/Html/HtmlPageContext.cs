@@ -13,24 +13,26 @@ namespace FairyGUI.Utils
         Stack<IHtmlObject> _buttonPool;
         Stack<IHtmlObject> _selectPool;
         Stack<IHtmlObject> _linkPool;
+        Stack<IHtmlObject> _textPool;
 
         public static HtmlPageContext inst = new HtmlPageContext();
 
         static Transform _poolManager;
 
-        public HtmlPageContext()
+        public HtmlPageContext ()
         {
             _imagePool = new Stack<IHtmlObject>();
             _inputPool = new Stack<IHtmlObject>();
             _buttonPool = new Stack<IHtmlObject>();
             _selectPool = new Stack<IHtmlObject>();
             _linkPool = new Stack<IHtmlObject>();
+            _textPool = new Stack<IHtmlObject>();
 
             if (Application.isPlaying && _poolManager == null)
                 _poolManager = Stage.inst.CreatePoolManager("HtmlObjectPool");
         }
 
-        virtual public IHtmlObject CreateObject(RichTextField owner, HtmlElement element)
+        virtual public IHtmlObject CreateObject (RichTextField owner, HtmlElement element)
         {
             IHtmlObject ret = null;
             bool fromPool = false;
@@ -90,6 +92,16 @@ namespace FairyGUI.Utils
                 else
                     ret = new HtmlSelect();
             }
+            else if (element.type == HtmlElementType.Text)
+            {
+                if (_textPool.Count > 0 && _poolManager != null)
+                {
+                    ret = _textPool.Pop();
+                    fromPool = true;
+                }
+                else
+                    ret = new HtmlText();
+            }
 
             //Debug.Log("from=" + fromPool);
             if (ret != null)
@@ -109,7 +121,7 @@ namespace FairyGUI.Utils
             return ret;
         }
 
-        virtual public void FreeObject(IHtmlObject obj)
+        virtual public void FreeObject (IHtmlObject obj)
         {
             if (_poolManager == null)
             {
@@ -133,17 +145,19 @@ namespace FairyGUI.Utils
                 _buttonPool.Push(obj);
             else if (obj is HtmlLink)
                 _linkPool.Push(obj);
+            else if (obj is HtmlText)
+                _textPool.Push(obj);
 
             if (obj.displayObject != null)
                 obj.displayObject.cachedTransform.SetParent(_poolManager, false);
         }
 
-        virtual public NTexture GetImageTexture(HtmlImage image)
+        virtual public NTexture GetImageTexture (HtmlImage image)
         {
             return null;
         }
 
-        virtual public void FreeImageTexture(HtmlImage image, NTexture texture)
+        virtual public void FreeImageTexture (HtmlImage image, NTexture texture)
         {
         }
     }

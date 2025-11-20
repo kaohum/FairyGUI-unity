@@ -35,6 +35,7 @@ namespace FairyGUI
                 str = ParseTemplate(str);
 
             _textField.maxWidth = maxWidth;
+            _textField.maxHeight = maxHeight;
             if (_ubbEnabled)
                 richTextField.htmlText = UBBParser.inst.Parse(str);
             else

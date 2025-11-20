@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using FairyGUI.Utils;
@@ -222,6 +222,14 @@ namespace FairyGUI
                 mat.SetVector(ShaderConfig.ID_ClipBox, clipInfo.clipBox);
                 if (clipInfo.soft)
                     mat.SetVector(ShaderConfig.ID_ClipSoftness, clipInfo.softness);
+				else
+					mat.SetVector(ShaderConfig.ID_ClipSoftness, new Vector4(10000,10000,10000,10000));
+			}
+            else
+            {
+	            // 没有裁剪的情况
+	            mat.SetVector(ShaderConfig.ID_ClipBox, clipInfo.clipBox);
+	            mat.SetVector(ShaderConfig.ID_ClipSoftness, new Vector4(10000,10000,10000,10000));
             }
 
             if (stencilReferenceValue > 0)

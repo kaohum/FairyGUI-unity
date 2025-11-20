@@ -25,6 +25,8 @@ namespace FairyGUI
         float _barMaxHeightDelta;
         float _barStartX;
         float _barStartY;
+        int _displayMinx = 0; // 原因是进度条通常有圆角，为了避免圆角被压缩不美观，这里设置一个最低值
+        EventListener _onValueChanged;
 
         public GProgressBar()
         {
@@ -32,6 +34,14 @@ namespace FairyGUI
             _max = 100;
         }
 
+        /// <summary>
+        /// Dispatched when the object or its child was clicked.
+        /// </summary>
+        public EventListener onValueChanged
+        {
+            get { return _onValueChanged ?? (_onValueChanged = new EventListener(this, "onValueChanged")); }
+        }
+        
         /// <summary>
         /// 
         /// </summary>
@@ -107,6 +117,9 @@ namespace FairyGUI
 
                     _value = value;
                     Update(_value);
+
+                    // event
+                    BubbleEvent("onValueChanged", null);
                 }
             }
         }
@@ -117,11 +130,22 @@ namespace FairyGUI
             set { _reverse = value; }
         }
 
+        public void SetDisplayMinSize (int x) {
+            _displayMinx = x;
+            if (_barObjectH != null) 
+            {
+                Update(_value);
+            }
+            if (_barObjectV != null)
+            {
+                Update(_value);
+            }
+       
+        } 
+        
         /// <summary>
         /// 动态改变进度值。
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="duration"></param>
         public GTweener TweenValue(double value, float duration)
         {
             double oldValule;
@@ -149,7 +173,7 @@ namespace FairyGUI
         {
             float percent = Mathf.Clamp01((float)((newValue - _min) / (_max - _min)));
             if (_titleObject != null)
-            {
+            {   
                 switch (_titleType)
                 {
                     case ProgressTitleType.Percent:
@@ -175,18 +199,30 @@ namespace FairyGUI
                         break;
                 }
             }
+            
+            if (_aniObject != null)
+                _aniObject.frame = Mathf.RoundToInt(percent * 100);
 
             float fullWidth = this.width - _barMaxWidthDelta;
             float fullHeight = this.height - _barMaxHeightDelta;
+            
             if (!_reverse)
             {
                 if (_barObjectH != null)
                 {
+                    var percent2 = _displayMinx / fullWidth;
+                    if (percent > 0 && percent < percent2) {
+                        percent = percent2;
+                    }
                     if (!SetFillAmount(_barObjectH, percent))
                         _barObjectH.width = Mathf.RoundToInt(fullWidth * percent);
                 }
                 if (_barObjectV != null)
                 {
+                    var percent2 = _displayMinx / fullHeight;
+                    if (percent > 0 && percent < percent2) {
+                        percent = percent2;
+                    }
                     if (!SetFillAmount(_barObjectV, percent))
                         _barObjectV.height = Mathf.RoundToInt(fullHeight * percent);
                 }
@@ -195,6 +231,10 @@ namespace FairyGUI
             {
                 if (_barObjectH != null)
                 {
+                    var percent2 = _displayMinx / fullWidth;
+                    if (percent > 0 && percent < percent2) {
+                        percent = percent2;
+                    }
                     if (!SetFillAmount(_barObjectH, 1 - percent))
                     {
                         _barObjectH.width = Mathf.RoundToInt(fullWidth * percent);
@@ -203,6 +243,10 @@ namespace FairyGUI
                 }
                 if (_barObjectV != null)
                 {
+                    var percent2 = _displayMinx / fullHeight;
+                    if (percent > 0 && percent < percent2) {
+                        percent = percent2;
+                    }
                     if (!SetFillAmount(_barObjectV, 1 - percent))
                     {
                         _barObjectV.height = Mathf.RoundToInt(fullHeight * percent);
@@ -210,12 +254,96 @@ namespace FairyGUI
                     }
                 }
             }
-            if (_aniObject != null)
-                _aniObject.frame = Mathf.RoundToInt(percent * 100);
 
             InvalidateBatchingState(true);
         }
 
+        public void Update (double sureValue, double backValue, params GObject[] objs) {
+            float surePercent = Mathf.Clamp01((float)((sureValue - _min) / (_max - _min)));
+            float backPercent = Mathf.Clamp01((float)((backValue - _min) / (_max - _min)));
+            if (_titleObject != null)
+            {
+                switch (_titleType)
+                {
+                    case ProgressTitleType.Percent:
+                        if (RTLSupport.BaseDirection == RTLSupport.DirectionType.RTL)
+                            _titleObject.text = "%" + Mathf.FloorToInt(backPercent * 100);
+                        else
+                            _titleObject.text = Mathf.FloorToInt(backPercent * 100) + "%";
+                        break;
+                    case ProgressTitleType.ValueAndMax:
+                        if (RTLSupport.BaseDirection == RTLSupport.DirectionType.RTL)
+                            _titleObject.text = Math.Round(max) + "/" + Math.Round(backValue);
+                        else
+                            _titleObject.text = Math.Round(backValue) + "/" + Math.Round(max);
+                        break;
+                    case ProgressTitleType.Value:
+                        _titleObject.text = "" + Math.Round(backValue);
+                        break;
+                    case ProgressTitleType.Max:
+                        _titleObject.text = "" + Math.Round(_max);
+                        break;
+                }
+            }
+            
+            float fullWidth = this.width - _barMaxWidthDelta;
+            float fullHeight = this.height - _barMaxHeightDelta;
+            if (!_reverse)
+            {
+                foreach (var gObject in objs) {
+                    if (!SetFillAmount(gObject, backPercent))
+                        gObject.width = Mathf.RoundToInt(fullWidth * backPercent);
+                }
+            }
+            else
+            {
+                foreach (var gObject in objs) {
+                    if (!SetFillAmount(gObject, 1 - backPercent))
+                    {
+                        gObject.width = Mathf.RoundToInt(fullWidth * backPercent);
+                        gObject.x = _barStartX + (fullWidth - gObject.width);
+                    }
+                }
+            }
+            
+            if (!_reverse)
+            {
+                if (_barObjectH != null)
+                {
+                    if (!SetFillAmount(_barObjectH, surePercent))
+                        _barObjectH.width = Mathf.RoundToInt(fullWidth * surePercent);
+                }
+                if (_barObjectV != null)
+                {
+                    if (!SetFillAmount(_barObjectV, surePercent))
+                        _barObjectV.height = Mathf.RoundToInt(fullHeight * surePercent);
+                }
+            }
+            else
+            {
+                if (_barObjectH != null)
+                {
+                    if (!SetFillAmount(_barObjectH, 1 - surePercent))
+                    {
+                        _barObjectH.width = Mathf.RoundToInt(fullWidth * surePercent);
+                        _barObjectH.x = _barStartX + (fullWidth - _barObjectH.width);
+                    }
+                }
+                if (_barObjectV != null)
+                {
+                    if (!SetFillAmount(_barObjectV, 1 - surePercent))
+                    {
+                        _barObjectV.height = Mathf.RoundToInt(fullHeight * surePercent);
+                        _barObjectV.y = _barStartY + (fullHeight - _barObjectV.height);
+                    }
+                }
+            }
+            if (_aniObject != null)
+                _aniObject.frame = Mathf.RoundToInt(surePercent * 100);
+
+            InvalidateBatchingState(true);
+        }
+        
         bool SetFillAmount(GObject bar, float amount)
         {
             if ((bar is GImage) && ((GImage)bar).fillMethod != FillMethod.None)
@@ -291,7 +419,7 @@ namespace FairyGUI
                 else
                     buffer.Skip(4);
             }
-
+            
             Update(_value);
         }
 

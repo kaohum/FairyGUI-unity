@@ -28,6 +28,8 @@ namespace FairyGUI
         public event Action beforeUpdate;
         public event Action afterUpdate;
 
+        public GComponent CacheRoot => _cacheRoot;
+        
         DisplayObject _touchTarget;
         DisplayObject _focused;
         InputTextField _lastInput;
@@ -35,6 +37,7 @@ namespace FairyGUI
         UpdateContext _updateContext;
         List<DisplayObject> _rollOutChain;
         List<DisplayObject> _rollOverChain;
+        public bool isMultClick = true;
         TouchInfo[] _touches;
         int _touchCount;
         Vector2 _touchPosition;
@@ -50,6 +53,8 @@ namespace FairyGUI
         List<DisplayObject> _focusInChain;
         List<Container> _focusHistory;
         Container _nextFocus;
+        private GComponent _cacheRoot;
+        
         class CursorDef
         {
             public Texture2D texture;
@@ -86,10 +91,17 @@ namespace FairyGUI
         {
             if (_inst == null)
             {
+                DisplayObjectPool.InitPool();
+                
                 _inst = new Stage();
                 GRoot._inst = new GRoot();
                 GRoot._inst.ApplyContentScaleFactor();
                 _inst.AddChild(GRoot._inst.displayObject);
+                _inst._cacheRoot = new GComponent();
+                _inst._cacheRoot.name = _inst._cacheRoot.gameObjectName = "UICache";
+                _inst._cacheRoot.visible = false;
+                UnityEngine.GameObject.DontDestroyOnLoad(_inst._cacheRoot.displayObject.cachedTransform);
+                //_inst.AddChild(_inst._cacheRoot.displayObject);
 
                 StageCamera.CheckMainCamera();
             }
@@ -190,7 +202,9 @@ namespace FairyGUI
             _focusHistory = new List<Container>();
             _cursors = new Dictionary<string, CursorDef>();
 
-            SetSize(Screen.width, Screen.height);
+            var sageArea = Screen.safeArea;
+            //sageArea = new Rect(120, 0, Screen.width - 120, Screen.height);
+            SetSize(sageArea.width, sageArea.height);
             this.cachedTransform.localScale = new Vector3(StageCamera.DefaultUnitsPerPixel, StageCamera.DefaultUnitsPerPixel, StageCamera.DefaultUnitsPerPixel);
 
             StageEngine engine = GameObject.FindObjectOfType<StageEngine>();
@@ -202,9 +216,12 @@ namespace FairyGUI
             this.gameObject.AddComponent<StageEngine>();
             this.gameObject.AddComponent<UIContentScaler>();
             this.gameObject.SetActive(true);
+#if UNITY_EDITOR
+            if (Application.isPlaying)
+#endif
             UnityEngine.Object.DontDestroyOnLoad(this.gameObject);
 
-            EnableSound();
+            //EnableSound();
 
             Timers.inst.Add(5, 0, RunTextureCollector);
 
@@ -864,6 +881,7 @@ namespace FairyGUI
                 UIContentScaler scaler = this.gameObject.GetComponent<UIContentScaler>();
                 scaler.ApplyChange();
                 GRoot.inst.ApplyContentScaleFactor();
+                GRoot.inst.DispatchEvent("onOrientationChanged", null);
             }
         }
 
@@ -1085,10 +1103,14 @@ namespace FairyGUI
                     {
                         touch.UpdateEvent();
 
-                        if (Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))
-                            clickTarget.BubbleEvent("onRightClick", touch.evt);
-                        else
-                            clickTarget.BubbleEvent("onClick", touch.evt);
+                        if (Input.GetMouseButtonUp (1) || Input.GetMouseButtonUp (2))
+                            clickTarget.BubbleEvent ("onRightClick", touch.evt);
+                        else {
+#if UNITY_EDITOR
+                            Debug.LogWarning ("点击对象路径：" + GetFGUIObjPath(clickTarget.gOwner));
+#endif
+                            clickTarget.BubbleEvent ("onClick", touch.evt);
+                        }
                     }
 
                     touch.button = -1;
@@ -1099,7 +1121,28 @@ namespace FairyGUI
             if (Input.GetMouseButtonUp(0) && _currentCursor != null)
                 _ChangeCursor(_currentCursor);
         }
-
+        public string GetFGUIObjPath (GObject obj)
+        {
+            if (obj == null) return "";
+            var path = obj.name;
+            GObject _parent = obj.parent;
+            while (_parent != null) {
+                path = _parent.name + "." + path;
+                _parent = _parent.parent;
+            }
+            return path;
+        }
+        public string GetFGUIObjPath (DisplayObject obj)
+        {
+            if (obj == null) return "";
+            var path = obj.name;
+            DisplayObject _parent = obj.parent;
+            while (_parent != null) {
+                path = _parent.name + "." + path;
+                _parent = _parent.parent;
+            }
+            return path;
+        }
         void HandleTouchEvents()
         {
             int tc = Input.touchCount;
@@ -1156,7 +1199,8 @@ namespace FairyGUI
                         _touchCount--;
                         touch.End();
 
-                        if (uTouch.phase != TouchPhase.Canceled)
+                        // if (uTouch.phase != TouchPhase.Canceled && _touchCount == 0) 
+                        if (uTouch.phase != TouchPhase.Canceled && (isMultClick || tc == 1))
                         {
                             DisplayObject clickTarget = touch.ClickTest();
                             if (clickTarget != null)

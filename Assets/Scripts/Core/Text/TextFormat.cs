@@ -14,15 +14,33 @@ namespace FairyGUI
             Subscript
         }
 
+        private int _size;
         /// <summary>
         /// 
         /// </summary>
-        public int size;
+        public int size
+        {
+            get
+            {
+                return _size;
+            }
+
+            set
+            {
+                _size = (int)(value * UIConfig.textSizeScale);
+            }
+        }
 
         /// <summary>
         /// 
         /// </summary>
         public string font;
+
+        public bool fontChange;
+
+        public string offsetx = string.Empty;
+
+        public string offsety = string.Empty;
 
         /// <summary>
         /// 
@@ -94,7 +112,7 @@ namespace FairyGUI
         /// </summary>
         public Color shadowColor;
 
-        public TextFormat()
+        public TextFormat ()
         {
             color = Color.black;
             size = 12;
@@ -106,7 +124,7 @@ namespace FairyGUI
         /// 
         /// </summary>
         /// <param name="value"></param>
-        public void SetColor(uint value)
+        public void SetColor (uint value)
         {
             uint rr = (value >> 16) & 0x0000ff;
             uint gg = (value >> 8) & 0x0000ff;
@@ -122,7 +140,7 @@ namespace FairyGUI
         /// </summary>
         /// <param name="aFormat"></param>
         /// <returns></returns>
-        public bool EqualStyle(TextFormat aFormat)
+        public bool EqualStyle (TextFormat aFormat)
         {
             return size == aFormat.size && color == aFormat.color
                 && bold == aFormat.bold && underline == aFormat.underline
@@ -130,17 +148,22 @@ namespace FairyGUI
                 && strikethrough == aFormat.strikethrough
                 && gradientColor == aFormat.gradientColor
                 && align == aFormat.align
-                && specialStyle == aFormat.specialStyle;
+                && specialStyle == aFormat.specialStyle
+                && font == aFormat.font
+                && fontChange == aFormat.fontChange
+                && offsetx == aFormat.offsetx
+                && offsety == aFormat.offsety;
         }
 
         /// <summary>
         /// Only base NOT all formats will be copied
         /// </summary>
         /// <param name="source"></param>
-        public void CopyFrom(TextFormat source)
+        public void CopyFrom (TextFormat source)
         {
             this.size = source.size;
             this.font = source.font;
+            this.fontChange = source.fontChange;
             this.color = source.color;
             this.lineSpacing = source.lineSpacing;
             this.letterSpacing = source.letterSpacing;
@@ -148,6 +171,8 @@ namespace FairyGUI
             this.underline = source.underline;
             this.italic = source.italic;
             this.strikethrough = source.strikethrough;
+            this.offsetx = source.offsetx;
+            this.offsety = source.offsety;
             if (source.gradientColor != null)
             {
                 this.gradientColor = new Color32[4];
@@ -159,7 +184,7 @@ namespace FairyGUI
             this.specialStyle = source.specialStyle;
         }
 
-        public void FillVertexColors(Color32[] vertexColors)
+        public void FillVertexColors (Color32[] vertexColors)
         {
             if (gradientColor == null)
                 vertexColors[0] = vertexColors[1] = vertexColors[2] = vertexColors[3] = color;

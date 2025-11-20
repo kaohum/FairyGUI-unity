@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using FairyGUI.Utils;
 
@@ -21,6 +22,9 @@ namespace FairyGUI
         /// User defined data. 
         /// </summary>
         public object data;
+        
+        
+        public bool customData2;
 
         /// <summary>
         /// The source width of the object.
@@ -92,6 +96,46 @@ namespace FairyGUI
         /// </summary>
         public PackageItem packageItem;
 
+        #region chenhr 对释放的拓展
+
+        /// <summary>
+        /// 该对象释放时调用
+        /// </summary>
+        public System.Action<GObject> disposeAction { get; set; }
+
+        #endregion
+
+        private bool _hasDeserializeDataJsonObject = false;
+        public object _dataJsonObject;
+        
+        public Dictionary<string, object> dataJsonObject
+        {
+	        get
+	        {
+		        if (_hasDeserializeDataJsonObject)
+			        return (Dictionary<string, object>)_dataJsonObject;
+                
+		        _hasDeserializeDataJsonObject = true;
+
+		        var dataStr = data as string;
+		        if (string.IsNullOrEmpty(dataStr))
+			        return null;
+
+		        try
+		        {
+			        // 这里的dataJsonObject需要大家用自己的json库将data反序列化
+			        _dataJsonObject = LitJson.JsonMapper.ToObject<Dictionary<string, object>>(dataStr);
+		        }
+		        catch (Exception)
+		        {
+			        // ignore
+			        _dataJsonObject = null;
+		        }
+
+		        return (Dictionary<string, object>)_dataJsonObject;
+	        }
+        }
+        
         float _x;
         float _y;
         float _z;
@@ -1516,12 +1560,38 @@ namespace FairyGUI
             return pt;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="rect"></param>
-        /// <returns></returns>
-        public Rect LocalToGlobal(Rect rect)
+		public Vector3 LocalToScreen (Vector2 local)
+		{
+			Vector2 global = LocalToGlobal(local);
+			Vector3 screen = GlobalToScreen(global);
+			return screen;
+		}
+
+		public Vector2 ScreenToLocal (Vector3 screen)
+		{
+			Vector2 global = ScreenToGlobal(screen);
+			Vector2 local = GlobalToLocal(global);
+			return local;
+		}
+
+		public Vector3 GlobalToScreen (Vector2 global)
+		{
+			Vector3 screen = new Vector3(global.x, Screen.height - global.y, 0);
+			return screen;
+		}
+
+		public Vector2 ScreenToGlobal (Vector3 screen)
+		{
+			Vector2 global = new Vector2(screen.x, Screen.height - screen.y);
+			return global;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="rect"></param>
+		/// <returns></returns>
+		public Rect LocalToGlobal(Rect rect)
         {
             Rect ret = new Rect();
             Vector2 v = this.LocalToGlobal(new Vector2(rect.xMin, rect.yMin));
@@ -1559,8 +1629,8 @@ namespace FairyGUI
         public Vector2 LocalToRoot(Vector2 pt, GRoot r)
         {
             pt = LocalToGlobal(pt);
-            if (r == null || r == GRoot.inst)
-            {
+            if (r == null || r == GRoot.inst) {
+                pt.x -= GRoot.offset_x; // 刘海屏
                 //fast
                 pt.x /= UIContentScaler.scaleFactor;
                 pt.y /= UIContentScaler.scaleFactor;
@@ -1582,6 +1652,7 @@ namespace FairyGUI
             {
                 //fast
                 pt.x *= UIContentScaler.scaleFactor;
+                pt.x += GRoot.offset_x; // 刘海屏
                 pt.y *= UIContentScaler.scaleFactor;
             }
             else
@@ -1599,13 +1670,13 @@ namespace FairyGUI
             return WorldToLocal(pt, HitTestContext.cachedMainCamera);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="pt"></param>
-        /// <param name="camera"></param>
-        /// <returns></returns>
-        public Vector2 WorldToLocal(Vector3 pt, Camera camera)
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="pt"></param>
+		/// <param name="camera"></param>
+		/// <returns></returns>
+		public Vector2 WorldToLocal(Vector3 pt, Camera camera)
         {
             Vector3 v = camera.WorldToScreenPoint(pt);
             v.y = Screen.height - v.y;
@@ -1663,6 +1734,10 @@ namespace FairyGUI
 
             _disposed = true;
 
+            if (disposeAction != null) {
+                disposeAction.Invoke(this);
+                disposeAction = null;
+            }
             RemoveFromParent();
             RemoveEventListeners();
             relations.Dispose();

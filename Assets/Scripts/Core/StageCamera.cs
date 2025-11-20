@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace FairyGUI
 {
@@ -188,8 +189,14 @@ namespace FairyGUI
             camera.allowHDR = false;
             camera.allowMSAA = false;
 #endif
+            
+            // urp
+            var urpData = camera.GetUniversalAdditionalCameraData();
+            urpData.requiresDepthTexture = false;
+            urpData.requiresColorTexture = false;
+            
+            
             cameraObject.AddComponent<StageCamera>();
-
             return camera;
         }
     }

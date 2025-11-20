@@ -12,6 +12,7 @@ namespace FairyGUI
         double _min;
         double _max;
         double _value;
+        double _clapMax; //限制最大 默认等于max
         ProgressTitleType _titleType;
         bool _reverse;
         bool _wholeNumbers;
@@ -35,10 +36,54 @@ namespace FairyGUI
         public bool changeOnClick;
         public bool canDrag;
 
+        private double _secondMax;
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        public double SecondMax
+        {
+            get
+            {
+                return _secondMax;
+            }
+            set
+            {
+                if (_secondMax != value)
+                {
+                    _secondMax = value;
+                    Update();
+                }
+            }
+        }
+        
+        private double _secondMin;
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        public double SecondMin
+        {
+            get
+            {
+                return _secondMin;
+            }
+            set
+            {
+                if (_secondMin != value)
+                {
+                    _secondMin = value;
+                    Update();
+                }
+            }
+        }
+
         public GSlider()
         {
             _value = 50;
             _max = 100;
+            _secondMax = -1;
+            _secondMin = -1;
             changeOnClick = true;
             canDrag = true;
         }
@@ -115,6 +160,17 @@ namespace FairyGUI
                 }
             }
         }
+        
+        // 可控最大
+        public double clapMax
+        {
+	        get { return _clapMax; }
+	        set
+	        {
+		        _clapMax = value;
+		        Update();
+	        }
+        }
 
         /// <summary>
         /// 
@@ -156,11 +212,24 @@ namespace FairyGUI
 
         private void Update()
         {
-            UpdateWithPercent((float)((_value - _min) / (_max - _min)), false);
+	        if (_clapMax > 0 && _value > _clapMax)
+		        _value = _clapMax;
+	        if(_max == min)
+		        UpdateWithPercent(1, false);
+	        else
+				UpdateWithPercent((float)((_value - _min) / (_max - _min)), false);
         }
 
         private void UpdateWithPercent(float percent, bool manual)
         {
+            var tempMax = (float)(_secondMax / max);
+            var tempMin = (float)(_secondMin / max);
+            if (percent >= tempMax && _secondMax >= 0) {
+                percent = tempMax;
+            }
+            if (percent <= tempMin && tempMin >= 0) {
+                percent = tempMin;
+            }
             percent = Mathf.Clamp01(percent);
             if (manual)
             {
@@ -175,9 +244,11 @@ namespace FairyGUI
                     percent = Mathf.Clamp01((float)((newValue - _min) / (_max - _min)));
                 }
 
+             
                 if (newValue != _value)
                 {
                     _value = newValue;
+                 
                     if (DispatchEvent("onChanged", null))
                         return;
                 }
@@ -295,6 +366,10 @@ namespace FairyGUI
             onTouchBegin.Add(__barTouchBegin);
         }
 
+        public virtual void SetGripVisible (bool visible) {
+            _gripObject.visible = visible;
+        }
+        
         override public void Setup_AfterAdd(ByteBuffer buffer, int beginPos)
         {
             base.Setup_AfterAdd(buffer, beginPos);
@@ -372,7 +447,8 @@ namespace FairyGUI
                 percent = _clickPercent + deltaX / _barMaxWidth;
             else
                 percent = _clickPercent + deltaY / _barMaxHeight;
-
+            
+            ClapPercent(ref percent);
             UpdateWithPercent(percent, true);
         }
 
@@ -385,9 +461,22 @@ namespace FairyGUI
         {
             if (!changeOnClick)
                 return;
+            
+            if(_max == _min)
+	            return;
+            
+            if(_gripObject != null) // 添加按下启动滑动
+             Stage.inst.AddTouchMonitor(context.inputEvent.touchId, _gripObject);
 
             InputEvent evt = context.inputEvent;
             Vector2 pt = _gripObject.GlobalToLocal(new Vector2(evt.x, evt.y));
+            
+            if (_gripObject.pivotAsAnchor) // 减掉的加回来
+            {
+	            pt.x += _gripObject.width * _gripObject.pivot.x;
+	            pt.y += _gripObject.height * _gripObject.pivot.y;
+            }
+            
             float percent = Mathf.Clamp01((float)((_value - _min) / (_max - _min)));
             float delta = 0;
             if (_barObjectH != null)
@@ -398,8 +487,24 @@ namespace FairyGUI
                 percent -= delta;
             else
                 percent += delta;
-
+            
+            ClapPercent(ref percent);
             UpdateWithPercent(percent, true);
+            __gripTouchBegin(context);
+        }
+        
+        /// <summary>
+        /// 检测是否超过slider设置的上限值  若超过则控制滑动条比例
+        /// </summary>
+        /// <param name="percent"></param>
+        void ClapPercent(ref float percent)
+        {
+	        if (_clapMax > 0)
+	        {
+		        float maxTemp = Mathf.Clamp01((float) ((_clapMax - _min) / (_max - _min)));
+		        if (percent > maxTemp)
+			        percent = maxTemp;
+	        }
         }
     }
 }

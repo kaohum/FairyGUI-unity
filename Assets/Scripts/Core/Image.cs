@@ -26,7 +26,7 @@ namespace FairyGUI
         {
             _flags |= Flags.TouchDisabled;
 
-            CreateGameObject("Image");
+            CreateGameObject<Image>("Image");
             graphics = new NGraphics(gameObject);
             graphics.shader = ShaderConfig.imageShader;
             graphics.meshFactory = this;
@@ -35,6 +35,11 @@ namespace FairyGUI
 
             if (texture != null)
                 UpdateTexture(texture);
+        }
+
+        protected override void OnDestroyGameObject()
+        {
+            DestroyGameObject<Image>();
         }
 
         /// <summary>

@@ -49,9 +49,9 @@ namespace FairyGUI
         bool _ignoreEngineTimeScale;
         float _startTime;
         float _endTime;
-        GTweenCallback _delayedCallDelegate;
-        GTweenCallback _checkAllDelegate;
-        GTweenCallback1 _delayedCallDelegate2;
+        GTweenCallbackParameter _delayedCallDelegate;
+        GTweenCallbackParameter _checkAllDelegate;
+        GTweenCallback1Parameter _delayedCallDelegate2;
 
         const int OPTION_IGNORE_DISPLAY_CONTROLLER = 1;
         const int OPTION_AUTO_STOP_DISABLED = 2;
@@ -174,7 +174,7 @@ namespace FairyGUI
 
         void _Play(int times, float delay, float startTime, float endTime, PlayCompleteCallback onComplete, bool reverse)
         {
-            Stop(true, true);
+            Stop(true, false);
 
             _totalTimes = times;
             _reversed = reverse;
@@ -235,9 +235,9 @@ namespace FairyGUI
             }
 
             if (delay == 0)
-                OnDelayedPlay();
+                OnDelayedPlay(null);
             else
-                GTween.DelayedCall(delay).SetTarget(this).OnComplete(_delayedCallDelegate);
+                GTween.DelayedCall(delay).SetTarget(this).OnComplete(_delayedCallDelegate, null);
         }
 
         /// <summary>
@@ -750,7 +750,7 @@ namespace FairyGUI
                 Stop((_options & OPTION_AUTO_STOP_AT_END) != 0 ? true : false, false);
         }
 
-        void OnDelayedPlay()
+        void OnDelayedPlay(object obj)
         {
             InternalPlay();
 
@@ -931,7 +931,7 @@ namespace FairyGUI
                         .SetTimeScale(_timeScale)
                         .SetIgnoreEngineTimeScale(_ignoreEngineTimeScale)
                         .SetTarget(item)
-                        .OnComplete(_delayedCallDelegate2);
+                        .OnComplete(_delayedCallDelegate2, null);
                 }
             }
 
@@ -1010,7 +1010,7 @@ namespace FairyGUI
             }
         }
 
-        void OnDelayedPlayItem(GTweener tweener)
+        void OnDelayedPlayItem(GTweener tweener, object obj)
         {
             TransitionItem item = (TransitionItem)tweener.target;
             item.tweener = null;
@@ -1019,7 +1019,7 @@ namespace FairyGUI
             ApplyValue(item);
             CallHook(item, false);
 
-            CheckAllComplete();
+            CheckAllComplete(null);
         }
 
         public void OnTweenStart(GTweener tweener)
@@ -1148,14 +1148,14 @@ namespace FairyGUI
             if (tweener.allCompleted) //当整体播放结束时间在这个tween的中间时不应该调用结尾钩子
                 CallHook(item, true);
 
-            CheckAllComplete();
+            CheckAllComplete(null);
         }
 
         void OnPlayTransCompleted(TransitionItem item)
         {
             _totalTasks--;
 
-            CheckAllComplete();
+            CheckAllComplete(null);
         }
 
         void CallHook(TransitionItem item, bool tweenEnd)
@@ -1172,7 +1172,7 @@ namespace FairyGUI
             }
         }
 
-        void CheckAllComplete()
+        void CheckAllComplete(object obj)
         {
             if (_playing && _totalTasks == 0)
             {
@@ -1180,7 +1180,7 @@ namespace FairyGUI
                 {
                     InternalPlay();
                     if (_totalTasks == 0)
-                        GTween.DelayedCall(0).SetTarget(this).OnComplete(_checkAllDelegate);
+                        GTween.DelayedCall(0).SetTarget(this).OnComplete(_checkAllDelegate, null);
                 }
                 else
                 {
@@ -1189,7 +1189,7 @@ namespace FairyGUI
                     {
                         InternalPlay();
                         if (_totalTasks == 0)
-                            GTween.DelayedCall(0).SetTarget(this).OnComplete(_checkAllDelegate);
+                            GTween.DelayedCall(0).SetTarget(this).OnComplete(_checkAllDelegate, null);
                     }
                     else
                     {

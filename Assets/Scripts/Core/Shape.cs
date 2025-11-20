@@ -13,10 +13,15 @@ namespace FairyGUI
         /// </summary>
         public Shape()
         {
-            CreateGameObject("Shape");
+            CreateGameObject<Shape>("Shape");
             graphics = new NGraphics(gameObject);
             graphics.texture = NTexture.Empty;
             graphics.meshFactory = null;
+        }
+        
+        protected override void OnDestroyGameObject()
+        {
+            DestroyGameObject<Shape>();
         }
 
         /// <summary>

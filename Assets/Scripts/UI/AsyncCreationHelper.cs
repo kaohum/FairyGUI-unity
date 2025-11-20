@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using FairyGUI.Utils;
@@ -33,8 +34,12 @@ namespace FairyGUI
             for (int i = 0; i < cnt; i++)
             {
                 di = itemList[i];
+                
                 if (di.packageItem != null)
                 {
+                    if (di.packageItem.owner != null) {
+                        di.packageItem.owner.GetItemAsset(di.packageItem);
+                    }
                     obj = UIObjectFactory.NewObject(di.packageItem);
                     objectPool.Add(obj);
 
@@ -43,7 +48,14 @@ namespace FairyGUI
                     {
                         int poolStart = objectPool.Count - di.childCount - 1;
 
-                        ((GComponent)obj).ConstructFromResource(objectPool, poolStart);
+                        try
+                        {
+	                        ((GComponent)obj).ConstructFromResource(objectPool, poolStart);
+                        }
+                        catch (Exception e)
+                        {
+							Debug.LogException(e);
+                        }
 
                         objectPool.RemoveRange(poolStart, di.childCount);
                     }

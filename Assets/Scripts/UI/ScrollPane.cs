@@ -67,7 +67,7 @@ namespace FairyGUI
 
         Action _refreshDelegate;
         TimerCallback _tweenUpdateDelegate;
-        GTweenCallback1 _hideScrollBarDelegate;
+        GTweenCallback1Parameter _hideScrollBarDelegate;
 
         GComponent _owner;
         Container _maskContainer;
@@ -88,7 +88,18 @@ namespace FairyGUI
         public static float TWEEN_TIME_GO = 0.3f; //调用SetPos(ani)时使用的缓动时间
         public static float TWEEN_TIME_DEFAULT = 0.3f; //惯性滚动的最小缓动时间
         public static float PULL_RATIO = 0.5f; //下拉过顶或者上拉过底时允许超过的距离占显示区域的比例
-
+        public bool fullRoll
+        {
+            get { return _fullRoll; }
+            set { _fullRoll = value;
+                if (!_fullRoll)
+                {
+                    _touchEffect = true;
+                }
+            }
+        }
+        private bool _fullRoll = true;
+        
         public ScrollPane(GComponent owner)
         {
             _onScroll = new EventListener(this, "onScroll");
@@ -1112,6 +1123,18 @@ namespace FairyGUI
 
             _contentSize.x = aWidth;
             _contentSize.y = aHeight;
+            if (fullRoll)
+            {
+                if (_scrollType == ScrollType.Horizontal)
+                {
+                    _touchEffect = contentWidth >= viewWidth;
+                }
+                else if(_scrollType == ScrollType.Vertical)
+                {
+                    _touchEffect = contentHeight >= viewHeight;
+                }
+                
+            }
             HandleSizeChanged();
         }
 
@@ -1129,6 +1152,17 @@ namespace FairyGUI
 
             _contentSize.x += deltaWidth;
             _contentSize.y += deltaHeight;
+            if (fullRoll)
+            {
+                if (_scrollType == ScrollType.Horizontal)
+                {
+                    _touchEffect = contentWidth >= viewWidth;
+                }
+                else if(_scrollType == ScrollType.Vertical)
+                {
+                    _touchEffect = contentHeight >= viewHeight;
+                }
+            }
             HandleSizeChanged();
 
             if (_tweening == 1)
@@ -1780,7 +1814,7 @@ namespace FairyGUI
             if (_scrollBarDisplayAuto && !_hover && _tweening == 0 && !_dragged && !bar.gripDragging)
             {
                 if (bar.displayObject.visible)
-                    GTween.To(1, 0, 0.5f).SetDelay(0.5f).OnComplete(_hideScrollBarDelegate).SetTarget(bar, TweenPropType.Alpha);
+                    GTween.To(1, 0, 0.5f).SetDelay(0.5f).OnComplete(_hideScrollBarDelegate, null).SetTarget(bar, TweenPropType.Alpha);
             }
             else
             {
@@ -1789,7 +1823,7 @@ namespace FairyGUI
             }
         }
 
-        private void __barTweenComplete(GTweener tweener)
+        private void __barTweenComplete(GTweener tweener, object obj)
         {
             GObject bar = (GObject)tweener.target;
             bar.alpha = 1;

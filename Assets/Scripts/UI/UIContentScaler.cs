@@ -32,22 +32,22 @@ namespace FairyGUI
         /// <summary>
         /// 
         /// </summary>
-        public ScaleMode scaleMode;
+        public ScaleMode scaleMode = ScaleMode.ScaleWithScreenSize;
 
         /// <summary>
         /// 
         /// </summary>
-        public ScreenMatchMode screenMatchMode;
+        public ScreenMatchMode screenMatchMode = ScreenMatchMode.MatchWidthOrHeight;
 
         /// <summary>
         /// 
         /// </summary>
-        public int designResolutionX;
+        public int designResolutionX = 1334;
 
         /// <summary>
         /// 
         /// </summary>
-        public int designResolutionY;
+        public int designResolutionY = 750;
 
         /// <summary>
         /// 
@@ -77,11 +77,12 @@ namespace FairyGUI
 
         [System.NonSerialized]
         bool _changed;
+        private ScreenOrientation _last;
 
         void OnEnable()
         {
-            if (Application.isPlaying)
-            {
+            if (Application.isPlaying) {
+                _last = Screen.orientation;
                 //播放模式下都是通过Stage自带的UIContentScaler实现调整的，所以这里只是把参数传过去
                 UIContentScaler scaler = Stage.inst.gameObject.GetComponent<UIContentScaler>();
                 if (scaler != this)
@@ -105,6 +106,7 @@ namespace FairyGUI
                     }
                     scaler.ApplyChange();
                     GRoot.inst.ApplyContentScaleFactor();
+                    GameObject.Destroy(this);
                 }
             }
             else //Screen width/height is not reliable in OnEnable in editmode
@@ -118,6 +120,24 @@ namespace FairyGUI
                 _changed = false;
                 ApplyChange();
             }
+#if UNITY_EDITOR
+            if (Application.isPlaying) {
+#endif
+            
+                if (Screen.orientation != _last) {
+                    _last = Screen.orientation;
+                    GRoot.inst.ApplyContentScaleFactor();
+                    GRoot.inst.DispatchEvent("onOrientationChanged", null);                
+                    Debug.Log($"{Time.frameCount} {this.GetHashCode()} Screen.orientation changed = {Screen.orientation}");
+                }
+#if UNITY_EDITOR
+
+                if (GRoot.safeAreaDirty) {
+                    GRoot.safeAreaDirty = false;
+                    GRoot.inst.ApplyContentScaleFactor();
+                }
+            }
+#endif
         }
 
         void OnDestroy()

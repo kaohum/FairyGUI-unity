@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Text;
 
 namespace FairyGUI.Utils
@@ -40,10 +41,38 @@ namespace FairyGUI.Utils
                     {
                         if (entity.Length > 1)
                         {
-                            if (entity[1] == 'x')
-                                u = Convert.ToInt16(entity.Substring(2), 16);
-                            else
-                                u = Convert.ToInt16(entity.Substring(1));
+	                        if (entity[1] == 'x')
+	                        {
+		                        var c = entity.Substring(2);
+		                        try
+		                        {
+			                        u = Convert.ToInt32(c, 16);
+		                        }
+		                        catch (Exception e)
+		                        {
+			                        UnityEngine.Debug.LogException(e);
+		                        }
+		                        finally
+		                        {
+			                        u = 0;
+		                        }
+	                        }
+	                        else
+	                        {
+		                        var c = entity.Substring(1);
+		                        try
+		                        {
+			                        u = Convert.ToInt32(c, 16);
+		                        }
+		                        catch (Exception e)
+		                        {
+			                        UnityEngine.Debug.LogException(e);
+		                        }
+		                        finally
+		                        {
+			                        u = 0;
+		                        }
+	                        }
                             sb.Append((char)u);
                             pos1 = pos2 + 1;
                         }

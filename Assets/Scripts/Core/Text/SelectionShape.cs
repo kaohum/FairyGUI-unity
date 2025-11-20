@@ -13,12 +13,17 @@ namespace FairyGUI
 
         public SelectionShape()
         {
-            CreateGameObject("SelectionShape");
+            CreateGameObject<SelectionShape>("SelectionShape");
             graphics = new NGraphics(gameObject);
             graphics.texture = NTexture.Empty;
             graphics.meshFactory = this;
 
             rects = new List<Rect>();
+        }
+
+        protected override void OnDestroyGameObject()
+        {
+            DestroyGameObject<SelectionShape>();
         }
 
         /// <summary>

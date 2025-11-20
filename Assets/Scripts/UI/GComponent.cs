@@ -44,7 +44,7 @@ namespace FairyGUI
         Controller _applyingController;
 
         EventListener _onDrop;
-
+        
         public GComponent()
         {
             _children = new List<GObject>();
@@ -100,7 +100,7 @@ namespace FairyGUI
                 _peerTable = null;
             }
 #endif
-
+            
 #if FAIRYGUI_PUERTS
             if (__onDispose != null)
                 __onDispose();
@@ -758,7 +758,9 @@ namespace FairyGUI
         /// <returns>transition object.</returns>
         public Transition GetTransitionAt(int index)
         {
-            return _transitions[index];
+            if (_transitions.Count > 0 && index < _transitions.Count)
+                return _transitions[index];
+            return null;
         }
 
         /// <summary>
@@ -1044,6 +1046,18 @@ namespace FairyGUI
             }
             return -1;
         }
+        
+        virtual public int GetLastChildInView()
+        {
+            int cnt = _children.Count;
+            for (int i = cnt - 1; i >= 0; --i)
+            {
+                GObject child = _children[i];
+                if (IsChildInView(child))
+                    return i;
+            }
+            return -1;
+        }
 
         protected void SetupScroll(ByteBuffer buffer)
         {
@@ -1138,7 +1152,7 @@ namespace FairyGUI
         /// If you want to access the correct child position immediatelly, call this function first.
         /// </summary>
         public void EnsureBoundsCorrect()
-        {
+        {    
             if (_boundsChanged)
                 UpdateBounds();
         }
@@ -1346,7 +1360,9 @@ namespace FairyGUI
             this.gameObjectName = packageItem.name;
 
             PackageItem contentItem = packageItem.getBranch();
-
+            if (contentItem == null) {
+                Debug.LogError("name==="+packageItem.name+"=="+packageItem.owner.name);
+            }
             if (!contentItem.translated)
             {
                 contentItem.translated = true;
@@ -1533,7 +1549,7 @@ namespace FairyGUI
                     rootContainer.hitArea = new ShapeHitTest(this.GetChildAt(i2).displayObject);
                 }
             }
-
+            
             if (buffer.version >= 5)
             {
                 string str = buffer.ReadS();
@@ -1544,6 +1560,7 @@ namespace FairyGUI
                 if (!string.IsNullOrEmpty(str2))
                     this.onRemovedFromStage.Add(() => __playSound(str2, 1));
             }
+
 
             buffer.Seek(0, 5);
 
@@ -1585,6 +1602,7 @@ namespace FairyGUI
 #if FAIRYGUI_PUERTS
             if (__onConstruct != null)
                 __onConstruct();
+
 #endif
         }
 
@@ -1645,7 +1663,7 @@ namespace FairyGUI
             if (sound != null && sound.nativeClip != null)
                 Stage.inst.PlayOneShotSound(sound.nativeClip, volumeScale);
         }
-
+        
         void __addedToStage()
         {
             int cnt = _transitions.Count;
@@ -1693,10 +1711,10 @@ namespace FairyGUI
             return false;
         }
 #endif
-
 #if FAIRYGUI_PUERTS
         public Action __onConstruct;
         public Action __onDispose;
 #endif
     }
 }
+

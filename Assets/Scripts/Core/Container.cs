@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -54,6 +54,7 @@ namespace FairyGUI
         DisplayObject _mask;
         Rect? _clipRect;
         List<DisplayObject> _descendants;
+		Dictionary<int, int> _wrapperSortingOrders;
 
         internal int _panelOrder;
         internal DisplayObject _lastFocus;
@@ -64,7 +65,7 @@ namespace FairyGUI
         public Container()
             : base()
         {
-            CreateGameObject("Container");
+            CreateGameObject<Container>("Container");
             Init();
         }
 
@@ -75,7 +76,7 @@ namespace FairyGUI
         public Container(string gameObjectName)
             : base()
         {
-            CreateGameObject(gameObjectName);
+            CreateGameObject<Container>(gameObjectName);
             Init();
         }
 
@@ -88,6 +89,11 @@ namespace FairyGUI
         {
             SetGameObject(attachTarget);
             Init();
+        }
+        
+        protected override void OnDestroyGameObject()
+        {
+            DestroyGameObject<Container>();
         }
 
         void Init()
@@ -680,6 +686,56 @@ namespace FairyGUI
             }
         }
 
+		/// <summary>
+		/// 是否强制合批，跳过默认的打断合批行为：如重叠时、穿插GLoader、GoWrapper时等；
+		/// 适用于大量重复创建的、对重叠检查不敏感的情况（如地图HUD）。
+		/// </summary>
+		public bool forceBatching
+		{
+			get { return (_flags & Flags.ForceBatching) != 0; }
+			set
+			{
+				bool oldValue = (_flags & Flags.ForceBatching) != 0;
+				if (oldValue != value)
+				{
+					if (value)
+						_flags |= Flags.ForceBatching;
+					else
+						_flags &= ~Flags.ForceBatching;
+					if (fairyBatching)
+					{
+						_flags |= Flags.BatchingRequested;
+						InvalidateBatchingState();
+					}
+				}
+			}
+		}
+
+		/// <summary>
+		/// 是否对同一BatchingRoot下的GoWraper进行合批。
+		/// 开启此选项时，GoWraper不应使用cloneMaterial。
+		/// </summary>
+		public bool wrapperBatching
+		{
+			get { return (_flags & Flags.WrapperBatching) != 0; }
+			set
+			{
+				bool oldValue = (_flags & Flags.WrapperBatching) != 0;
+				if (oldValue != value)
+				{
+					if (value)
+						_flags |= Flags.WrapperBatching;
+					else
+						_flags &= ~Flags.WrapperBatching;
+					if (fairyBatching)
+					{
+						_flags |= Flags.BatchingRequested;
+						InvalidateBatchingState();
+					}
+				}
+			}
+		}
+
         internal void UpdateBatchingFlags()
         {
             bool oldValue = (_flags & Flags.BatchingRoot) != 0;
@@ -853,12 +909,27 @@ namespace FairyGUI
             if (_mask != null)
                 _mask.renderingOrder = context.renderingOrder++;
 
+			bool wrapperBatching = (_flags & Flags.WrapperBatching) != 0;
+			if (_wrapperSortingOrders != null)
+				_wrapperSortingOrders.Clear();
+
             int cnt = _descendants.Count;
             for (int i = 0; i < cnt; i++)
             {
                 DisplayObject child = _descendants[i];
                 if (!(child.graphics != null && child.graphics._maskFlag == 1))
-                    child.renderingOrder = context.renderingOrder++;
+				{
+					if (wrapperBatching && child is GoWrapper)
+					{
+						if (_wrapperSortingOrders == null)
+							_wrapperSortingOrders = new Dictionary<int, int>();
+						(child as GoWrapper).SetRenderingOrderBatching(context, _wrapperSortingOrders);
+					}
+					else
+					{
+						child.renderingOrder = context.renderingOrder++;
+					}
+				}
 
                 if ((child._flags & Flags.BatchingRoot) != 0)
                     ((Container)child).SetRenderingOrder(context);
@@ -881,17 +952,23 @@ namespace FairyGUI
                 _descendants.Clear();
             CollectChildren(this, false);
 
+			bool forceBatching = this.forceBatching;
             int cnt = _descendants.Count;
 
             int i, j, k, m;
             object curMat, testMat, lastMat;
             DisplayObject current, test;
             float[] bound;
+			for (i = 0; i < cnt; ++i)
+			{
+				current = _descendants[i];
+				current._material = current.material; // 预先缓存
+			}
             for (i = 0; i < cnt; i++)
             {
                 current = _descendants[i];
                 bound = current._batchingBounds;
-                curMat = current.material;
+                curMat = current._material;
                 if (curMat == null || (current._flags & Flags.SkipBatching) != 0)
                     continue;
 
@@ -901,10 +978,10 @@ namespace FairyGUI
                 for (j = i - 1; j >= 0; j--)
                 {
                     test = _descendants[j];
-                    if ((test._flags & Flags.SkipBatching) != 0)
+                    if ((test._flags & Flags.SkipBatching) != 0 && !forceBatching)
                         break;
 
-                    testMat = test.material;
+                    testMat = test._material;
                     if (testMat != null)
                     {
                         if (lastMat != testMat)
@@ -914,8 +991,14 @@ namespace FairyGUI
                         }
 
                         if (curMat == testMat)
-                            k = m;
+						{
+							k = m;
+							break;
+						}
                     }
+
+					if (forceBatching) // 强制合批时，不再进行重叠检查
+						continue;
 
                     if ((bound[0] > test._batchingBounds[0] ? bound[0] : test._batchingBounds[0])
                         <= (bound[2] < test._batchingBounds[2] ? bound[2] : test._batchingBounds[2])

@@ -50,6 +50,11 @@ namespace FairyGUI
         /// </summary>
         public int sortingOrder;
 
+        /// <summary>
+        /// 是否创建
+        /// </summary>
+        public bool IsCreate => _created;
+
         [SerializeField]
         string packagePath;
         [SerializeField]

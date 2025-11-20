@@ -11,9 +11,11 @@ namespace FairyGUI
     /// </summary>
     public class DragDropManager
     {
-        private GLoader _agent;
+        private GComponent _agent;
+        private GComponent _tempCom;
+        private GLoader _tempIcon;
         private object _sourceData;
-        private GObject _source;
+        public GObject _source;
 
         private static DragDropManager _inst;
         public static DragDropManager inst
@@ -28,15 +30,19 @@ namespace FairyGUI
 
         public DragDropManager()
         {
-            _agent = (GLoader)UIObjectFactory.NewObject(ObjectType.Loader);
+            _agent = (GComponent)UIObjectFactory.NewObject(ObjectType.Component);
+            _tempIcon = (GLoader)UIObjectFactory.NewObject(ObjectType.Loader);
             _agent.gameObjectName = "DragDropAgent";
+            _tempIcon.name = "icon";
+            _tempIcon.icon = string.Empty;
+            _agent.asCom.AddChild(_tempIcon);
             _agent.SetHome(GRoot.inst);
             _agent.touchable = false;//important
             _agent.draggable = true;
-            _agent.SetSize(100, 100);
-            _agent.SetPivot(0.5f, 0.5f, true);
-            _agent.align = AlignType.Center;
-            _agent.verticalAlign = VertAlignType.Middle;
+            //_agent.SetSize(100, 100);
+            //_agent.SetPivot(0.5f, 0.5f, true);
+            _tempIcon.align = AlignType.Center;
+            _tempIcon.verticalAlign = VertAlignType.Middle;
             _agent.sortingOrder = int.MaxValue;
             _agent.onDragEnd.Add(__dragEnd);
         }
@@ -45,9 +51,27 @@ namespace FairyGUI
         /// Loader object for real dragging.
         /// 用于实际拖动的Loader对象。你可以根据实际情况设置loader的大小，对齐等。
         /// </summary>
-        public GLoader dragAgent
+        public GComponent dragAgent
         {
             get { return _agent; }
+        }
+        
+        /// <summary>
+        /// Loader object for real dragging.
+        /// 用于实际拖动的Loader对象。你可以根据实际情况设置loader的大小，对齐等。
+        /// </summary>
+        public GComponent tempCom
+        {
+            get { return _tempCom; }
+        }
+        
+        /// <summary>
+        /// Loader object for real dragging.
+        /// 用于实际拖动的Loader对象。你可以根据实际情况设置loader的大小，对齐等。
+        /// </summary>
+        public GLoader tempIcon
+        {
+            get { return _tempIcon; }
         }
 
         /// <summary>
@@ -60,23 +84,31 @@ namespace FairyGUI
         }
 
         /// <summary>
-        /// Start dragging.
-        /// 开始拖动。
+        /// StartDrag
         /// </summary>
-        /// <param name="source">Source object. This is the object which initiated the dragging.</param>
-        /// <param name="icon">Icon to be used as the dragging sign.</param>
-        /// <param name="sourceData">Custom data. You can get it in the onDrop event data.</param>
-        /// <param name="touchPointID">Copy the touchId from InputEvent to here, if has one.</param>
-        public void StartDrag(GObject source, string icon, object sourceData, int touchPointID = -1)
+        /// <param name="source"></param>
+        /// <param name="url"></param>
+        /// <param name="sourceData"></param>
+        /// <param name="touchPointID"></param>
+        /// <param name="action"></param>
+        /// <param name="type">=0 为Icon 1 = GComponent</param>
+        public void StartDrag(GObject source, string url, object sourceData, int touchPointID = -1,Action<GComponent> action = null,int type = 0)
         {
             if (_agent.parent != null)
                 return;
 
             _sourceData = sourceData;
             _source = source;
-            _agent.url = icon;
+            if (type == 0) {
+                _tempIcon.icon = url;
+            }else if (type == 1) {
+                _tempCom = (GComponent)UIPackage.CreateObjectFromURL(url);
+                _agent.size = _tempCom.size;
+                _agent.AddChild(_tempCom);
+                action?.Invoke(_tempCom);    
+            }
             GRoot.inst.AddChild(_agent);
-            _agent.xy = GRoot.inst.GlobalToLocal(Stage.inst.GetTouchPosition(touchPointID));
+            _agent.xy = GRoot.inst.GlobalToLocal(source.LocalToGlobal(Vector2.zero)/*Stage.inst.GetTouchPosition(touchPointID)*/);
             _agent.StartDrag(touchPointID);
         }
 
@@ -90,6 +122,11 @@ namespace FairyGUI
             {
                 _agent.StopDrag();
                 GRoot.inst.RemoveChild(_agent);
+                if (_tempCom != null) {
+                    _agent.RemoveChild(_tempCom);
+                    _tempIcon.url = string.Empty;
+                    GRoot.inst.RemoveChild(_tempCom);
+                }
                 _sourceData = null;
             }
         }
@@ -98,9 +135,16 @@ namespace FairyGUI
         {
             if (_agent.parent == null) //cancelled
                 return;
-
+            //GameObject.Destroy(_agent.displayObject.gameObject);
+            _agent.dragBounds = null;
             GRoot.inst.RemoveChild(_agent);
-
+            if (_tempCom != null) {
+                _agent.RemoveChild(_tempCom);
+                _tempIcon.url = string.Empty;
+                GRoot.inst.RemoveChild(_tempCom);
+                _tempCom.Dispose();
+                _tempCom = null;
+            }
             object sourceData = _sourceData;
             GObject source = _source;
             _sourceData = null;

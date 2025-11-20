@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using FairyGUI.Utils;
 
@@ -14,6 +17,7 @@ namespace FairyGUI
         protected string _text;
         protected bool _ubbEnabled;
         protected bool _updatingSize;
+        protected bool _ignoreWordSingleScale;
         protected Dictionary<string, string> _templateVars;
 
         public GTextField()
@@ -32,6 +36,90 @@ namespace FairyGUI
             _textField.wordWrap = false;
         }
 
+        //----------------------------------- 渐变色 begin ----------------------------------
+        /// <summary>
+        /// 渐变色
+        /// </summary>
+        public Color32[] gradientColor
+        {
+	        get => _textField.textFormat.gradientColor;
+	        set
+	        {
+		        var tf = _textField.textFormat;
+                
+		        if (value == null)
+		        {
+			        if (tf.gradientColor == null)
+				        return;
+                    
+			        tf.gradientColor = null;
+		        }
+		        else if (tf.gradientColor == value)
+		        {
+			        // do nothing
+		        }
+		        else if (tf.gradientColor == null)
+		        {
+			        tf.gradientColor = new Color32[4];
+			        value.CopyTo(this.gradientColor, 0);
+		        }
+		        else
+		        {
+			        value.CopyTo(this.gradientColor, 0);
+		        }
+                
+		        _textField.textFormat = tf;
+		        UpdateGear(4);
+	        }
+        }
+        
+        /// <summary>
+        /// 设置四方向渐变色
+        /// </summary>
+        public void UpdateGradientColor(Color32 leftTop, Color32 leftBottom, Color32 rightTop, Color32 rightBottom)
+        {
+	        var tf = _textField.textFormat;
+
+	        if (tf.gradientColor == null)
+	        {
+		        var buffer = new Color32[4];
+		        buffer[0] = leftTop;
+		        buffer[1] = leftBottom;
+		        buffer[2] = rightTop;
+		        buffer[3] = rightBottom;
+            
+		        this.gradientColor = buffer;
+	        }
+	        else
+	        {
+		        var buffer = tf.gradientColor;
+		        buffer[0] = leftTop;
+		        buffer[1] = leftBottom;
+		        buffer[2] = rightTop;
+		        buffer[3] = rightBottom;
+            
+		        this.gradientColor = buffer;
+	        }
+        }
+        
+        /// <summary>
+        /// 设置从上到下的渐变色
+        /// </summary>
+        public void UpdateVerticalGradientColor(Color32 top, Color32 bottom)
+        {
+	        UpdateGradientColor(top, bottom, top, bottom);
+        }
+        
+        /// <summary>
+        /// 设置从左到右的渐变色
+        /// </summary>
+        public void UpdateHorizontalGradientColor(Color32 left, Color32 right)
+        {
+	        UpdateGradientColor(left, left, right, right);
+        }
+        
+        //----------------------------------- 渐变色 end ----------------------------------
+        
         override protected void CreateDisplayObject()
         {
             _textField = new TextField();
@@ -54,6 +142,10 @@ namespace FairyGUI
             {
                 if (value == null)
                     value = string.Empty;
+
+                // 开了数字格式转换
+                value = _SetText(value);
+                
                 _text = value;
                 SetTextFieldText();
                 UpdateSize();
@@ -64,10 +156,13 @@ namespace FairyGUI
         virtual protected void SetTextFieldText()
         {
             string str = _text;
+            
+            // 开启了模板
             if (_templateVars != null)
                 str = ParseTemplate(str);
 
             _textField.maxWidth = maxWidth;
+            _textField.maxHeight = maxHeight;
             if (_ubbEnabled)
                 _textField.htmlText = UBBParser.inst.Parse(XMLUtils.EncodeString(str));
             else
@@ -330,6 +425,22 @@ namespace FairyGUI
             get { return _textField.textHeight; }
         }
 
+        /// <summary>
+        /// 值为true时单行单个单词不再受到缩放的影响
+        /// </summary>
+        public bool ignoreSingleWordScale{
+            get { return _textField.ignoreLineSingleWordScale;}
+            set { _textField.ignoreLineSingleWordScale = value;}
+        }
+
+        /// <summary>
+        /// 值为true时单个单词部分超过宽度不再整体换行
+        /// </summary>
+        public bool ignoreWordLineFeed{
+            get { return _textField.ignoreWordLineFeed;}
+            set { _textField.ignoreWordLineFeed = value;}
+        }
+
         protected void UpdateSize()
         {
             if (_updatingSize)
@@ -422,6 +533,9 @@ namespace FairyGUI
             }
 
             _textField.textFormat = tf;
+
+            //add for locale
+            _Setup_BeforeAdd2(buffer, beginPos);
         }
 
         override public void Setup_AfterAdd(ByteBuffer buffer, int beginPos)
@@ -433,6 +547,144 @@ namespace FairyGUI
             string str = buffer.ReadS();
             if (str != null)
                 this.text = str;
+            
+            UIUtils.SetupGradientText(this, dataJsonObject);
         }
+        
+        
+        #region add for Locale
+        //是否应用千分隔符
+        public bool IsNumberSeparator;
+
+        //是否开启数字缩写
+        public bool IsShortNumber;
+
+        public long[] shortParams;
+
+        const string MARK_K = "K";
+        const string MARK_M = "M";
+        const string MARK_B = "B";
+        const string FLAG_SHORTNUM = "shortNumber&";
+        const string FLAG_SEPRARATOR = "separatorNumber&";
+        const string REX_PARAM_SHORTNUM = @"shortNumber&\[(.+?)\]";
+        static Regex regexShortNum = new Regex(REX_PARAM_SHORTNUM); 
+        const string REX_SPRARATOR = @"(-?\d+)(\d\d\d)";
+        static Regex regexSpraratorNum = new Regex(REX_SPRARATOR);
+        
+        private string _SetText(string value)
+        {
+            string t = value;
+
+            if (IsShortNumber)
+            {
+                if (long.TryParse(value, out var longRet))
+                {
+                    if (shortParams != null && shortParams.Length == 6)
+                    {
+                        t = CoverToShortNumber(longRet, shortParams[0], shortParams[1],
+                            shortParams[2], shortParams[3], shortParams[4], shortParams[5]);
+                    }
+                    else
+                    {
+                        t = CoverToShortNumber(longRet);
+                    }
+                }
+            }
+
+            if (IsNumberSeparator)
+            {
+                t = NumberToString(t);
+            }
+            
+            return t;
+        }
+
+        private void _Setup_BeforeAdd2(ByteBuffer buffer, int beginPos)
+        {
+            IsNumberSeparator = false;
+            IsShortNumber = false;
+            string customData = data?.ToString();
+            if (!string.IsNullOrEmpty(customData))
+            {
+                if (customData.Contains(FLAG_SHORTNUM))
+                {
+                    IsShortNumber = true;
+                    
+                    var mc = regexShortNum.Match(customData);
+                    if (mc.Success)
+                    {
+                        string[] paramlist = mc.Groups[1].Value.Split(';');
+                        if (paramlist.Length == 6)
+                        {
+                            long.TryParse(paramlist[0], out long beginK);
+                            long.TryParse(paramlist[1], out long decimalK);
+                            long.TryParse(paramlist[2], out long beginM);
+                            long.TryParse(paramlist[3], out long decimalM);
+                            long.TryParse(paramlist[4], out long beginB);
+                            long.TryParse(paramlist[5], out long decimalB);
+                            shortParams = new[] {beginK, decimalK, beginM, decimalM, beginB, decimalB};
+                        }
+                    }
+                }
+
+                if (customData.Contains(FLAG_SEPRARATOR))
+                {
+                    IsNumberSeparator = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 传入79963123，返回格式如"79,963,123"
+        /// 传入79963.1K，返回格式如"79,963.1K"
+        /// </summary>
+        public string NumberToString(string number)
+        {
+            var mc = regexSpraratorNum.Match(number);
+            while (mc.Success)
+            {
+                number = regexSpraratorNum.Replace(number, "$1,$2");
+                mc = regexSpraratorNum.Match(number);
+            }
+
+            return number;
+        }
+        
+        private string TransformNum(long num, double baseNum, long deciamlNum, string nail)
+        {
+            double temp = num / baseNum;
+
+            double keepDeciaml = Math.Pow(10, deciamlNum);
+            temp = (long) (temp * keepDeciaml) / keepDeciaml;
+            return temp + nail;
+        }
+
+        public string CoverToShortNumber(long num, 
+            long beginK = 1000, long decimalK = 1, 
+            long beginM = 1000000, long decimalM = 1,
+            long beginB = 1000000000, long decimalB = 1)
+        {
+            string ret;
+            if (num >= beginB)
+            {
+                ret = TransformNum(num, Math.Pow(10, 9), decimalB, MARK_B);
+            }
+            else if (num >= beginM)
+            {
+                ret = TransformNum(num, Math.Pow(10, 6), decimalM, MARK_M);
+            }
+            else if (num >= beginK)
+            {
+                ret = TransformNum(num, Math.Pow(10, 3), decimalK, MARK_K);
+            }
+            else
+            {
+                ret = num.ToString();
+            }
+
+            return ret;
+        }
+        
+        #endregion
     }
 }

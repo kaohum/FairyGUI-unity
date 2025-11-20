@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using FairyGUI.Utils;
 using System;
+using UnityEngine;
 
 namespace FairyGUI
 {
@@ -76,7 +77,7 @@ namespace FairyGUI
                     _previousIndex = _selectedIndex;
                     _selectedIndex = value;
                     parent.ApplyController(this);
-
+                    
                     DispatchEvent("onChanged", null);
 
                     changing = false;

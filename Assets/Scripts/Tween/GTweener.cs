@@ -10,12 +10,14 @@ namespace FairyGUI
     /// 
     /// </summary>
     public delegate void GTweenCallback();
+    public delegate void GTweenCallbackParameter(object param);
 
     /// <summary>
     /// 
     /// </summary>
     /// <param name="tweener"></param>
     public delegate void GTweenCallback1(GTweener tweener);
+    public delegate void GTweenCallback1Parameter(GTweener tweener, object param);
 
     /// <summary>
     /// 
@@ -68,11 +70,12 @@ namespace FairyGUI
 
         GTweenCallback _onUpdate;
         GTweenCallback _onStart;
-        GTweenCallback _onComplete;
+        GTweenCallbackParameter _onComplete;
         GTweenCallback1 _onUpdate1;
         GTweenCallback1 _onStart1;
-        GTweenCallback1 _onComplete1;
+        GTweenCallback1Parameter _onComplete1;
         ITweenListener _listener;
+        object _paramData;
 
         TweenValue _startValue;
         TweenValue _endValue;
@@ -342,9 +345,10 @@ namespace FairyGUI
 #if FAIRYGUI_TOLUA
         [NoToLua]
 #endif
-        public GTweener OnComplete(GTweenCallback callback)
+        public GTweener OnComplete(GTweenCallbackParameter callback, object param)
         {
             _onComplete = callback;
+            _paramData = param;
             return this;
         }
 
@@ -375,9 +379,10 @@ namespace FairyGUI
         /// </summary>
         /// <param name="callback"></param>
         /// <returns></returns>
-        public GTweener OnComplete(GTweenCallback1 callback)
+        public GTweener OnComplete(GTweenCallback1Parameter callback, object param)
         {
             _onComplete1 = callback;
+            _paramData = param;
             return this;
         }
 
@@ -610,8 +615,11 @@ namespace FairyGUI
             _target = null;
             _listener = null;
             _userData = null;
-            _onStart = _onUpdate = _onComplete = null;
-            _onStart1 = _onUpdate1 = _onComplete1 = null;
+            _onStart = _onUpdate = null;
+            _onStart1 = _onUpdate1 = null;
+            _onComplete = null;
+            _onComplete1 = null;
+            _paramData = null;
         }
 
         internal void _Update()
@@ -834,9 +842,9 @@ namespace FairyGUI
                 try
                 {
                     if (_onComplete1 != null)
-                        _onComplete1(this);
+                        _onComplete1(this, _paramData);
                     if (_onComplete != null)
-                        _onComplete();
+                        _onComplete(_paramData);
                     if (_listener != null)
                         _listener.OnTweenComplete(this);
                 }
@@ -848,9 +856,9 @@ namespace FairyGUI
             else
             {
                 if (_onComplete1 != null)
-                    _onComplete1(this);
+                    _onComplete1(this, _paramData);
                 if (_onComplete != null)
-                    _onComplete();
+                    _onComplete(_paramData);
                 if (_listener != null)
                     _listener.OnTweenComplete(this);
             }

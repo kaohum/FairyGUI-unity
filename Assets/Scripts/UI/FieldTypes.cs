@@ -35,7 +35,8 @@
         Slider,
         ScrollBar,
         Tree,
-        Loader3D
+        Loader3D,
+        GObject,
     }
 
     public enum AlignType
@@ -72,9 +73,9 @@
     public enum AutoSizeType
     {
         None,
-        Both,
-        Height,
-        Shrink
+        Both, // 自动宽度高度
+        Height, // 自动高度
+        Shrink // 自动收缩
     }
 
     public enum ScrollType

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
+
 #if FAIRYGUI_TOLUA
 using LuaInterface;
 #endif
@@ -37,10 +39,17 @@ namespace FairyGUI
             if (url == null)
                 throw new Exception("Invaild url: " + url);
 
-            PackageItem pi = UIPackage.GetItemByURL(url);
-            if (pi != null)
-                pi.extensionCreator = creator;
+            //PackageItem pi = UIPackage.GetItemByURL(url);
+            //if (pi != null)
+            //    pi.extensionCreator = creator;
+            /*
+            else
+                Debug.LogError($"FGUI SetPackageItemExtension => {url} 绑定创建方式失败！");
+            */
 
+            if (packageItemExtensions.ContainsKey (url)) {
+                UnityEngine.Debug.LogError ("url注册重复： " + url);
+            }
             packageItemExtensions[url] = creator;
         }
 
@@ -193,6 +202,9 @@ namespace FairyGUI
 
                 case ObjectType.Loader3D:
                     return new GLoader3D();
+                
+                case ObjectType.GObject:
+                    return new GObject();
 
                 default:
                     return null;

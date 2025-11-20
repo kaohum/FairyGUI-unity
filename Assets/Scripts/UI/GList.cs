@@ -35,6 +35,11 @@ namespace FairyGUI
         public bool foldInvisibleItems = false;
 
         /// <summary>
+        /// 起始坐标从左顶点变化到右定点，只有对横向流动和竖向流动启作用
+        /// </summary>
+        public bool invertLeftToRight = false;
+
+        /// <summary>
         /// List selection mode
         /// </summary>
         /// <seealso cref="ListSelectionMode"/>
@@ -2673,6 +2678,17 @@ namespace FairyGUI
                     }
                     ch = curY + Mathf.CeilToInt(maxHeight);
                     cw = viewWidth;
+                    if(invertLeftToRight)
+                    {
+                        for (i = 0; i < cnt; i++)
+                        {
+                            child = GetChildAt(i);
+                            if (foldInvisibleItems && !child.visible)
+                                continue;
+                            float x = child.x;
+                            child.x = cw-x;
+                        }
+                    }
                 }
                 else
                 {
@@ -2704,6 +2720,18 @@ namespace FairyGUI
                     }
                     ch = curY + Mathf.CeilToInt(maxHeight);
                     cw = Mathf.CeilToInt(maxWidth);
+                    if(invertLeftToRight)
+                    {
+                        for (i = 0; i < cnt; i++)
+                        {
+                            child = GetChildAt(i);
+                            if (foldInvisibleItems && !child.visible)
+                                continue;
+                            float x = child.x;
+                            child.x = cw-x;
+                        }
+                    }
+                    
                 }
             }
             else if (_layout == ListLayoutType.FlowVertical)
@@ -2754,6 +2782,17 @@ namespace FairyGUI
                     }
                     cw = curX + Mathf.CeilToInt(maxWidth);
                     ch = viewHeight;
+                    if(invertLeftToRight)
+                    {
+                        for (i = 0; i < cnt; i++)
+                        {
+                            child = GetChildAt(i);
+                            if (foldInvisibleItems && !child.visible)
+                                continue;
+                            float x = child.x;
+                            child.x = cw-x-Mathf.CeilToInt(maxWidth);
+                        }
+                    }
                 }
                 else
                 {
@@ -2765,7 +2804,6 @@ namespace FairyGUI
 
                         if (curY != 0)
                             curY += _lineGap;
-
                         if (_lineCount != 0 && j >= _lineCount
                             || _lineCount == 0 && curY + child.height > viewHeight && maxWidth != 0)
                         {
@@ -2784,6 +2822,17 @@ namespace FairyGUI
                     }
                     cw = curX + Mathf.CeilToInt(maxWidth);
                     ch = Mathf.CeilToInt(maxHeight);
+                    if(invertLeftToRight)
+                    {
+                        for (i = 0; i < cnt; i++)
+                        {
+                            child = GetChildAt(i);
+                            if (foldInvisibleItems && !child.visible)
+                                continue;
+                            float x = child.x;
+                            child.x = cw-x-Mathf.CeilToInt(maxWidth);
+                        }
+                    }
                 }
             }
             else //pagination

@@ -39,8 +39,11 @@ namespace FairyGUI
         {
             _inst = this;
             gameObject = new GameObject("[FairyGUI.Timers]");
-            gameObject.hideFlags = HideFlags.HideInHierarchy;
+            gameObject.hideFlags = HideFlags.DontSave;
             gameObject.SetActive(true);
+#if UNITY_EDITOR
+            if (Application.isPlaying)
+#endif
             Object.DontDestroyOnLoad(gameObject);
 
             _engine = gameObject.AddComponent<TimersEngine>();
@@ -111,9 +114,14 @@ namespace FairyGUI
             Add(0.001f, 0, callback, callbackParam);
         }
 
-        public void StartCoroutine(IEnumerator routine)
+        public Coroutine StartCoroutine(IEnumerator routine)
         {
-            _engine.StartCoroutine(routine);
+            return _engine.StartCoroutine(routine);
+        }
+
+        public void StopCoroutine(Coroutine routine)
+        {
+            _engine.StopCoroutine(routine);
         }
 
         public bool Exists(TimerCallback callback)
@@ -160,6 +168,11 @@ namespace FairyGUI
         private void ReturnToPool(Anymous_T t)
         {
             t.callback = null;
+            if (_pool.Contains(t))
+            {
+	            Debug.LogError($"{t.GetHashCode()} 重复回收");
+	            return;
+            }
             _pool.Add(t);
         }
 
@@ -181,6 +194,7 @@ namespace FairyGUI
                     }
 
                     i.elapsed += dt;
+
                     if (i.elapsed < i.interval)
                         continue;
 
@@ -261,14 +275,6 @@ namespace FairyGUI
             this.repeat = repeat;
             this.callback = callback;
             this.param = param;
-        }
-    }
-
-    class TimersEngine : MonoBehaviour
-    {
-        void Update()
-        {
-            Timers.inst.Update();
         }
     }
 }

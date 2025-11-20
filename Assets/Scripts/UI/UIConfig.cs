@@ -8,8 +8,8 @@ namespace FairyGUI
     /// Global configs. These options should be set before any UI construction.
     /// </summary>
     [AddComponentMenu("FairyGUI/UI Config")]
-    public class UIConfig : MonoBehaviour
-    {
+    public class UIConfig : MonoBehaviour {
+        public static float textSizeScale = 1f; //add by chenbin
         /// <summary>
         /// Dynamic Font Support. 
         /// 4.x: Put the xxx.ttf into /Resources or /Resources/Fonts, and set defaultFont="xxx".
@@ -33,7 +33,7 @@ namespace FairyGUI
         /// <summary>
         /// When a modal window is in front, the background becomes dark.
         /// </summary>
-        public static Color modalLayerColor = new Color(0f, 0f, 0f, 0.4f);
+        public static Color modalLayerColor = new Color(0f, 0f, 0f, 0.5f);
 
         /// <summary>
         /// Default button click sound.
@@ -168,6 +168,33 @@ namespace FairyGUI
         /// Suggest to enable it on low dpi (e.g. 96dpi) screens.
         /// </summary>
         public static bool makePixelPerfect = false;
+
+        /// <summary>
+        /// 前置标点（不能出现在行尾）（英文符号）
+        /// </summary>
+        public static string TextPrePunctuation = "\"'([{<";
+        /// <summary>
+        /// 前置标点（不能出现在行尾）（中文符号）
+        /// </summary>
+        public static string TextPrePunctuation_CN = "“‘（【｛《";
+        /// <summary>
+        /// 后置标点（不能出现在行首）（英文符号）
+        /// </summary>
+        public static string TextPostPunctuation = "\"',;.?!)]}>";
+        /// <summary>
+        /// 后置标点（不能出现在行首）（中文符号）
+        /// </summary>
+        public static string TextPostPunctuation_CN = "”’，；。？！）】｝》、";
+
+        /// <summary>
+        /// 单词的最大长度（影响单词换行）
+        /// </summary>
+        public static int WordMaxLength = 25;
+        
+        /// <summary>
+        /// 中文字符Unicode码，配置时请参考网上资料，前一个是起始位，后一个是结束为，所以必须是成对出现
+        /// </summary>
+        public static int [] ChineseUniCodeRange = {0x4E00,0x9FA5,0x9FA6,0x9FFF,0x3400,0x4DBF,0x20000,0x2A6DF,0x2A700,0x2B739,0x2B740,0x2B81D,0x2B820,0x2CEA1,0x2CEB0,0x2EBE0,0x30000,0x3134A,0x31350,0x323AF,0x31C0,0x31E3};
 
         public enum ConfigKey
         {
