@@ -1,6 +1,6 @@
-﻿using UnityEngine;
-using UnityEditor;
 using FairyGUI;
+using UnityEngine;
+using UnityEditor;
 
 namespace FairyGUIEditor
 {
@@ -49,6 +49,15 @@ namespace FairyGUIEditor
                 bool fairyBatching = EditorGUILayout.Toggle("FairyBatching", ((Container)obj).fairyBatching);
                 if (EditorGUI.EndChangeCheck())
                     ((Container)obj).fairyBatching = fairyBatching;
+				EditorGUI.BeginChangeCheck();
+				bool forceBatching = EditorGUILayout.Toggle("ForceBatching", ((Container)obj).forceBatching);
+				if (EditorGUI.EndChangeCheck())
+					((Container)obj).forceBatching = forceBatching;
+				EditorGUI.BeginChangeCheck();
+				bool wrapperBatching = EditorGUILayout.Toggle("WrapperBatching", ((Container)obj).wrapperBatching);
+				if (EditorGUI.EndChangeCheck())
+					((Container)obj).wrapperBatching = wrapperBatching;
+				EditorGUILayout.LabelField("numChildren", $"{((Container)obj).numChildren} -- {GetChildrenNum((Container)obj)}");
             }
 
             GObject gObj = obj.gOwner;

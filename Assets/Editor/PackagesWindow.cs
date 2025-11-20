@@ -1,11 +1,13 @@
-﻿using FairyGUI;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+#if UNITY_5_3_OR_NEWER
 using UnityEditor.SceneManagement;
-using System.Collections.Generic;
+#endif
 #if UNITY_2018_3_OR_NEWER
 using UnityEditor.Experimental.SceneManagement;
 #endif
+using FairyGUI;
 
 namespace FairyGUIEditor
 {
