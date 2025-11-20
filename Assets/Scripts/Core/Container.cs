@@ -64,7 +64,7 @@ namespace FairyGUI
         public Container()
             : base()
         {
-            CreateGameObject("Container");
+            CreateGameObject<Container>("Container");
             Init();
         }
 
@@ -75,7 +75,7 @@ namespace FairyGUI
         public Container(string gameObjectName)
             : base()
         {
-            CreateGameObject(gameObjectName);
+            CreateGameObject<Container>(gameObjectName);
             Init();
         }
 

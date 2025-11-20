@@ -310,7 +310,7 @@ namespace FairyGUI
 			_materialsBackup.Clear();
 		}
 
-		public override int renderingOrder
+		/*public override int renderingOrder
 		{
 			get { return base.renderingOrder; }
 			set
@@ -320,7 +320,7 @@ namespace FairyGUI
 				/*if (_canvas != null)
 				    _canvas.sortingOrder = value;
 				else
-				{*/
+				{#1#
 				int cnt = _renderers.Count;
 				for (int i = 0; i < cnt; i++)
 				{
@@ -334,11 +334,33 @@ namespace FairyGUI
 				}
 				// }
 			}
-		}
+		}*/
+
+		/*
+		override public void SetRenderingOrder(UpdateContext context, bool inBatch)
+		{
+			if ((_flags & Flags.GameObjectDisposed) != 0)
+			{
+				DisplayDisposedWarning();
+				return;
+			}
+
+			int cnt = _renderers.Count;
+			for (int i = 0; i < cnt; i++)
+			{
+				RendererInfo ri = _renderers[i];
+				if (ri.renderer != null)
+				{
+					if (i != 0 && _renderers[i].sortingOrder != _renderers[i - 1].sortingOrder)
+						value = UpdateContext.current.renderingOrder++;
+					ri.renderer.sortingOrder = value;
+				}
+			}
+		}*/
 
 		public void SetRenderingOrderBatching(UpdateContext context, Dictionary<int, int> wrapperSortingOrders)
 		{
-			int rOrder = -1;
+			/*int rOrder = -1;
 			int cnt = _renderers.Count;
 			for (int i = 0; i < cnt; i++)
 			{
@@ -360,7 +382,8 @@ namespace FairyGUI
 			{
 				rOrder = context.renderingOrder++;
 			}
-			base.renderingOrder = rOrder;
+
+			base.SetRenderingOrder(context, rOrder);*/
 		}
 
 		override protected bool SetLayer (int value, bool fromParent)

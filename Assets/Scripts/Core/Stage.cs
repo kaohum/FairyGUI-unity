@@ -1336,7 +1336,7 @@ namespace FairyGUI
                         touch.End();
 
                         // if (uTouch.phase != TouchPhase.Canceled && _touchCount == 0) 
-                        if (uTouch.phase != TouchPhase.Canceled && (isMultClick || tc == 1))
+                        if (uTouch.phase != TouchPhase.Canceled && (isMultClick || Input.touchCount == 1))
                         {
                             DisplayObject clickTarget = touch.ClickTest();
                             if (clickTarget != null)
