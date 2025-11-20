@@ -2055,7 +2055,7 @@ namespace FairyGUI
             int cnt = buffer.ReadShort();
             for (int i = 0; i < cnt; i++)
             {
-                int nextPos = buffer.ReadShort();
+                int nextPos = buffer.ReadUshort();
                 nextPos += buffer.position;
 
                 GearBase gear = GetGear(buffer.ReadByte());

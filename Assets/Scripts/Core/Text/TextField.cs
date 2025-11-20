@@ -36,6 +36,7 @@ namespace FairyGUI
         float _renderScale;
         int _fontVersion;
         string _parsedText;
+        int _ellipsisCharIndex;
         /// <summary>
         /// 是否一行只有一个单词
         /// </summary>
@@ -54,6 +55,7 @@ namespace FairyGUI
         const int GUTTER_X = 2;
         const int GUTTER_Y = 2;
         const float IMAGE_BASELINE = 0.8f;
+        const int ELLIPSIS_LENGTH = 2;
         static float[] STROKE_OFFSET = new float[]
         {
              -1, 0, 1, 0,
@@ -605,7 +607,7 @@ namespace FairyGUI
         {
             if ((_flags & Flags.UpdatingSize) == 0)
             {
-                if (_autoSize == AutoSizeType.Shrink || _wordWrap && (_flags & Flags.WidthChanged) != 0)
+                if (_autoSize == AutoSizeType.Shrink || _autoSize == AutoSizeType.Ellipsis || _wordWrap && (_flags & Flags.WidthChanged) != 0)
                     _textChanged = true;
                 else if (_autoSize != AutoSizeType.None)
                     graphics.SetMeshDirty();
@@ -649,6 +651,8 @@ namespace FairyGUI
             {
                 _font.SetFormat(_textFormat, _fontSizeScale);
                 _font.PrepareCharacters(_parsedText);
+                if (_autoSize == AutoSizeType.Ellipsis)
+                    _font.PrepareCharacters("…");
             }
             else
             {
@@ -660,6 +664,8 @@ namespace FairyGUI
                     {
                         _font.SetFormat(element.format, _fontSizeScale);
                         _font.PrepareCharacters(element.text);
+                        if (_autoSize == AutoSizeType.Ellipsis)
+                            _font.PrepareCharacters("…");
                     }
                 }
             }
@@ -678,6 +684,7 @@ namespace FairyGUI
             graphics.SetMeshDirty();
             _renderScale = UIContentScaler.scaleFactor;
             _fontSizeScale = 1;
+            _ellipsisCharIndex = -1;
 
             Cleanup();
 
@@ -913,10 +920,12 @@ namespace FairyGUI
             float letterSpacing = _textFormat.letterSpacing * _fontSizeScale;
             float lineSpacing = (_textFormat.lineSpacing - 1) * _fontSizeScale;
             float rectWidth = _contentRect.width - GUTTER_X * 2;
+            float rectHeight = _contentRect.height > 0 ? Mathf.Max(_contentRect.height, _font.GetLineHeight(_textFormat.size)) : 0;
             float glyphWidth = 0, glyphHeight = 0, baseline = 0;
             short wordLen = 0;
             bool wordPossible = false;
             float posx = 0;
+            bool checkEdge = _autoSize == AutoSizeType.Ellipsis;
 
             TextFormat format = _textFormat;
             _font.SetFormat(format, _fontSizeScale);
@@ -1119,6 +1128,9 @@ namespace FairyGUI
                     newLine.y2 = newLine.y;
                     newLine.charIndex = line.charIndex + line.charCount;
 
+                    if (checkEdge && line.y + line.height < rectHeight)
+                        _ellipsisCharIndex = line.charIndex + Math.Max(0, line.charCount - ELLIPSIS_LENGTH);
+
                     sLineChars.Clear();
                     wordPossible = false;
                     posx = 0;
@@ -1210,6 +1222,8 @@ namespace FairyGUI
                         wordPossible = false;
                         line = newLine;
                     }
+                    else if (checkEdge && _ellipsisCharIndex == -1)
+                        _ellipsisCharIndex = line.charIndex + Math.Max(0, line.charCount - ELLIPSIS_LENGTH);
                 }
                 if (newWordLength > 0)
                 {
@@ -1249,6 +1263,10 @@ namespace FairyGUI
             if (_textWidth > 0)
                 _textWidth += GUTTER_X * 2;
             _textHeight = line.y + line.height + GUTTER_Y;
+
+            if (checkEdge && _textWidth <= _contentRect.width && _textHeight <= _contentRect.height + GUTTER_Y)
+                _ellipsisCharIndex = -1;
+
             _textWidth = Mathf.RoundToInt(_textWidth);
             _textHeight = Mathf.RoundToInt(_textHeight);
         }
@@ -1488,7 +1506,7 @@ namespace FairyGUI
 
             float posx = 0;
             float indent_x;
-            bool clipping = !_input && _autoSize == AutoSizeType.None;
+            bool clipping = !_input && (_autoSize == AutoSizeType.None || _autoSize == AutoSizeType.Ellipsis);
             bool lineClipped;
             AlignType lineAlign;
             float glyphWidth, glyphHeight, baseline;
@@ -1568,6 +1586,7 @@ namespace FairyGUI
                 {
                     int charIndex = line.charIndex + j;
                     char ch = rtlLine != null ? rtlLine[j] : _parsedText[charIndex];
+                    bool isEllipsis = charIndex == _ellipsisCharIndex;
 
                     while (element != null && charIndex == element.charIndex)
                     {
@@ -1671,7 +1690,7 @@ namespace FairyGUI
                                     _charPositions.Add(cp);
                                 }
 
-                                if (lineClipped || clipping && (posx < GUTTER_X || posx > GUTTER_X && posx + htmlObj.width > _contentRect.width - GUTTER_X))
+                                if (isEllipsis || lineClipped || clipping && (posx < GUTTER_X || posx > GUTTER_X && posx + htmlObj.width > _contentRect.width - GUTTER_X))
                                     element.status |= 1;
                                 else
                                     element.status &= 254;
@@ -1698,7 +1717,9 @@ namespace FairyGUI
                             element = null;
                     }
 
-                    if (ch == '\0')
+                    if (isEllipsis)
+                        ch = '…';
+                    else if (ch == '\0')
                         continue;
 
                     if (!isSubFont && _font.GetGlyph(ch == '\t' ? ' ' : ch, out glyphWidth, out glyphHeight, out baseline))
@@ -1706,22 +1727,25 @@ namespace FairyGUI
                         if (ch == '\t')
                             glyphWidth *= 4;
 
-                        if (_textDirection == RTLSupport.DirectionType.RTL)
+                        if (!isEllipsis)
                         {
-                            if (lineClipped || clipping && (rectWidth < 7 || posx != (indent_x - GUTTER_X)) && posx < GUTTER_X - 0.5f) //超出区域，剪裁
+                            if (_textDirection == RTLSupport.DirectionType.RTL)
                             {
-                                posx -= (letterSpacing + glyphWidth);
-                                continue;
-                            }
+                                if (lineClipped || clipping && (rectWidth < 7 || posx != (indent_x - GUTTER_X)) && posx < GUTTER_X - 0.5f) //超出区域，剪裁
+                                {
+                                    posx -= (letterSpacing + glyphWidth);
+                                    continue;
+                                }
 
-                            posx -= glyphWidth;
-                        }
-                        else
-                        {
-                            if (lineClipped || clipping && (rectWidth < 7 || posx != (GUTTER_X + indent_x)) && posx + glyphWidth > _contentRect.width - GUTTER_X + 0.5f) //超出区域，剪裁
+                                posx -= glyphWidth;
+                            }
+                            else
                             {
-                                posx += letterSpacing + glyphWidth;
-                                continue;
+                                if (lineClipped || clipping && (rectWidth < 7 || posx != (GUTTER_X + indent_x)) && posx + glyphWidth > _contentRect.width - GUTTER_X + 0.5f) //超出区域，剪裁
+                                {
+                                    posx += letterSpacing + glyphWidth;
+                                    continue;
+                                }
                             }
                         }
 
@@ -1759,6 +1783,9 @@ namespace FairyGUI
                         else
                             posx += letterSpacing;
                     }
+
+                    if (isEllipsis)
+                        lineClipped = true;
                 }//text loop
 
                 if (!lineClipped)

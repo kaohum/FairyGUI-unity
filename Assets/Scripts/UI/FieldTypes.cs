@@ -75,7 +75,8 @@
         None,
         Both, // 自动宽度高度
         Height, // 自动高度
-        Shrink // 自动收缩
+        Shrink, // 自动收缩
+        Ellipsis
     }
 
     public enum ScrollType
