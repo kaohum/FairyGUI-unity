@@ -2609,8 +2609,6 @@ namespace FairyGUI
                             continue;
 
                         child.SetSize(viewWidth, child.height, true);
-                        if (child.width > maxWidth)
-                            maxWidth = child.width;
                     }
                 }
                 cw = Mathf.CeilToInt(maxWidth);
@@ -2644,8 +2642,6 @@ namespace FairyGUI
                             continue;
 
                         child.SetSize(child.width, viewHeight, true);
-                        if (child.height > maxHeight)
-                            maxHeight = child.height;
                     }
                 }
                 ch = Mathf.CeilToInt(maxHeight);

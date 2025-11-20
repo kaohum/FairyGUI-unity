@@ -59,6 +59,14 @@ namespace FairyGUI
         public static int ID_Stencil2;
         public static int ID_GrayPhase; // gowrapper use 
 
+#if UNITY_2019_3_OR_NEWER
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void InitializeOnLoad()
+        {
+            Get = Shader.Find;
+        }
+#endif
+
         static ShaderConfig()
         {
             ID_ClipBox = Shader.PropertyToID("_ClipBox");

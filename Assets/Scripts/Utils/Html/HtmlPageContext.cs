@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
 namespace FairyGUI.Utils
@@ -15,9 +16,28 @@ namespace FairyGUI.Utils
         Stack<IHtmlObject> _linkPool;
         Stack<IHtmlObject> _textPool;
 
-        public static HtmlPageContext inst = new HtmlPageContext();
+        static HtmlPageContext _inst;
+
+        public static HtmlPageContext inst
+        {
+            get
+            {
+                if (_inst == null)
+                    _inst = new HtmlPageContext();
+                return _inst;
+            }
+        }
 
         static Transform _poolManager;
+
+#if UNITY_2019_3_OR_NEWER
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void InitializeOnLoad()
+        {
+            _inst = null;
+            _poolManager = null;
+        }
+#endif
 
         public HtmlPageContext ()
         {
@@ -69,7 +89,12 @@ namespace FairyGUI.Utils
                         fromPool = true;
                     }
                     else
-                        ret = new HtmlButton();
+                    {
+                        if (HtmlButton.resource != null)
+                            ret = new HtmlButton();
+                        else
+                            Debug.LogWarning("FairyGUI: Set HtmlButton.resource first");
+                    }
                 }
                 else
                 {
@@ -90,7 +115,12 @@ namespace FairyGUI.Utils
                     fromPool = true;
                 }
                 else
-                    ret = new HtmlSelect();
+                {
+                    if (HtmlSelect.resource != null)
+                        ret = new HtmlSelect();
+                    else
+                        Debug.LogWarning("FairyGUI: Set HtmlSelect.resource first");
+                }
             }
             else if (element.type == HtmlElementType.Text)
             {

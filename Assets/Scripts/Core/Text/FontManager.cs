@@ -11,6 +11,8 @@ namespace FairyGUI
     {
         public static Dictionary<string, BaseFont> sFontFactory = new Dictionary<string, BaseFont>();
 
+        static bool _checkTextMeshPro;
+
         /// <summary>
         /// 
         /// </summary>
@@ -112,7 +114,13 @@ namespace FairyGUI
             else
             {
                 if (asset.GetType().Name.Contains("TMP_FontAsset"))
-                    Debug.LogWarning("To enable TextMeshPro support, add script define symbol: FAIRYGUI_TMPRO");
+                {
+                    if (!_checkTextMeshPro)
+                    {
+                        _checkTextMeshPro = true;
+                        Debug.LogWarning("To enable TextMeshPro support, add script define symbol: FAIRYGUI_TMPRO");
+                    }
+                }
 
                 return Fallback(name);
             }
@@ -157,5 +165,14 @@ namespace FairyGUI
 
             sFontFactory.Clear();
         }
+
+#if UNITY_2019_3_OR_NEWER
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void InitializeOnLoad()
+        {
+            Clear();
+            _checkTextMeshPro = false;
+        }
+#endif
     }
 }
