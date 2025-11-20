@@ -1124,83 +1124,92 @@ namespace FairyGUI
                     posx = 0;
                     line = newLine;
                 }
-                else if (wrap && posx > rectWidth)
+                else if (posx > rectWidth)
                 {
-                    int lineCharCount = sLineChars.Count;
-                    int toMoveChars;
-                    if (wordPossible && wordLen > 0 && wordLen < UIConfig.WordMaxLength && lineCharCount > 2 && wordLen < lineCharCount) //if word had broken, move word to new line
+                    if (wrap)
                     {
-                        toMoveChars = _ignoreWordLineFeed ? 1 : wordLen;
-                        if (char.IsWhiteSpace(_parsedText[lineCharCount - (toMoveChars + 1)]))
+                        int lineCharCount = sLineChars.Count;
+                        int toMoveChars;
+                        if (wordPossible && wordLen > 0 && wordLen < UIConfig.WordMaxLength && lineCharCount > 2 &&
+                            wordLen < lineCharCount) //if word had broken, move word to new line
                         {
-                            //we caculate the line width WITHOUT the tailing space
-                            UpdateLineInfo(line, letterSpacing, lineCharCount - (toMoveChars + 1));
-                            line.charCount++; //but keep it in this line.
-                        }
-                        else if(IsPrePunctuation(_parsedText[lineCharCount - (toMoveChars + 1)]))
-                        {
-                            UpdateLineInfo(line, letterSpacing, lineCharCount - (toMoveChars + 1));
-                            toMoveChars++;
+                            toMoveChars = _ignoreWordLineFeed ? 1 : wordLen;
+                            if (char.IsWhiteSpace(_parsedText[lineCharCount - (toMoveChars + 1)]))
+                            {
+                                //we caculate the line width WITHOUT the tailing space
+                                UpdateLineInfo(line, letterSpacing, lineCharCount - (toMoveChars + 1));
+                                line.charCount++; //but keep it in this line.
+                            }
+                            else if (IsPrePunctuation(_parsedText[lineCharCount - (toMoveChars + 1)]))
+                            {
+                                UpdateLineInfo(line, letterSpacing, lineCharCount - (toMoveChars + 1));
+                                toMoveChars++;
+                            }
+                            else
+                            {
+                                UpdateLineInfo(line, letterSpacing, lineCharCount - toMoveChars);
+                            }
                         }
                         else
                         {
-                            UpdateLineInfo(line, letterSpacing, lineCharCount - toMoveChars);
-                        }
-                    }
-                    else
-                    {
-                        if (lineCharCount > 2)
-                        {
-                            toMoveChars = 1;
-                            int index = 0;
-                            if (index < lineCharCount && IsPostPunctuation(_parsedText[charIndex - index]))
+                            if (lineCharCount > 2)
                             {
-                                toMoveChars++;
+                                toMoveChars = 1;
+                                int index = 0;
+                                if (index < lineCharCount && IsPostPunctuation(_parsedText[charIndex - index]))
+                                {
+                                    toMoveChars++;
+                                    index++;
+                                }
+
                                 index++;
+                                if (index < lineCharCount && IsPrePunctuation(_parsedText[charIndex - index]))
+                                {
+                                    toMoveChars++;
+                                }
+
+                                if (toMoveChars >= lineCharCount)
+                                {
+                                    toMoveChars = 1; // 乱七八糟的特殊字符串，不管符号行首/尾规则了！
+                                }
                             }
-                            index++;
-                            if (index < lineCharCount && IsPrePunctuation(_parsedText[charIndex - index]))
+                            else
                             {
-                                toMoveChars++;
+                                toMoveChars =
+                                    lineCharCount > 1 ? 1 : 0; //if only one char here, we cant move it to new line
                             }
-                            if (toMoveChars >= lineCharCount)
+
+                            UpdateLineInfo(line, letterSpacing, lineCharCount - toMoveChars);
+
+                        }
+
+                        LineInfo newLine = LineInfo.Borrow();
+
+                        _lines.Add(newLine);
+                        newLine.y = line.y + (line.height + lineSpacing);
+                        if (newLine.y < GUTTER_Y)
+                            newLine.y = GUTTER_Y;
+                        newLine.y2 = newLine.y;
+                        newLine.charIndex = line.charIndex + line.charCount;
+                        posx = 0;
+                        if (toMoveChars != 0)
+                        {
+                            for (int i = line.charCount; i < lineCharCount; i++)
                             {
-                                toMoveChars = 1; // 乱七八糟的特殊字符串，不管符号行首/尾规则了！
+                                LineCharInfo ci = sLineChars[i];
+                                if (posx != 0)
+                                    posx += letterSpacing;
+                                posx += ci.width;
                             }
+
+                            sLineChars.RemoveRange(0, line.charCount);
                         }
                         else
-                        {
-                            toMoveChars = lineCharCount > 1 ? 1 : 0; //if only one char here, we cant move it to new line
-                        }
-                        UpdateLineInfo(line, letterSpacing, lineCharCount - toMoveChars);
+                            sLineChars.Clear();
 
+                        wordPossible = false;
+                        line = newLine;
                     }
-                    LineInfo newLine = LineInfo.Borrow();
-
-                    _lines.Add(newLine);
-                    newLine.y = line.y + (line.height + lineSpacing);
-                    if (newLine.y < GUTTER_Y)
-                        newLine.y = GUTTER_Y;
-                    newLine.y2 = newLine.y;
-                    newLine.charIndex = line.charIndex + line.charCount;
-                    posx = 0;
-                    if (toMoveChars != 0)
-                    {
-                        for (int i = line.charCount; i < lineCharCount; i++)
-                        {
-                            LineCharInfo ci = sLineChars[i];
-                            if (posx != 0)
-                                posx += letterSpacing;
-                            posx += ci.width;
-                        }
-
-                        sLineChars.RemoveRange(0, line.charCount);
-                    }
-                    else
-                        sLineChars.Clear();
-
-                    wordPossible = false;
-                    line = newLine;
                 }
                 if (newWordLength > 0)
                 {
