@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace FairyGUI
+namespace FairyGUI 
 {
     /// <summary>
     /// Base class for all kind of fonts. 
