@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -53,8 +53,7 @@ namespace FairyGUI
         List<DisplayObject> _children;
         DisplayObject _mask;
         Rect? _clipRect;
-        List<DisplayObject> _descendants;
-		Dictionary<int, int> _wrapperSortingOrders;
+        List<BatchElement> _batchElements;
 
         internal int _panelOrder;
         internal DisplayObject _lastFocus;
@@ -65,7 +64,7 @@ namespace FairyGUI
         public Container()
             : base()
         {
-            CreateGameObject<Container>("Container");
+            CreateGameObject("Container");
             Init();
         }
 
@@ -76,7 +75,7 @@ namespace FairyGUI
         public Container(string gameObjectName)
             : base()
         {
-            CreateGameObject<Container>(gameObjectName);
+            CreateGameObject(gameObjectName);
             Init();
         }
 
@@ -89,11 +88,6 @@ namespace FairyGUI
         {
             SetGameObject(attachTarget);
             Init();
-        }
-        
-        protected override void OnDestroyGameObject()
-        {
-            DestroyGameObject<Container>();
         }
 
         void Init()
@@ -421,6 +415,7 @@ namespace FairyGUI
                 if (_mask != value)
                 {
                     _mask = value;
+                    _flags |= Flags.BatchingRequested;
                     UpdateBatchingFlags();
                 }
             }
@@ -522,7 +517,7 @@ namespace FairyGUI
             if (Display.displays.Length > 1)
             {
                 Vector3 p = Display.RelativeMouseAt(HitTestContext.screenPoint);
-                if (p != Vector3.zero)
+                if (p.x != 0 || p.y != 0) //(p != Vector3.zero) we got (0,0,1) in some unity version, especially on recovering from sleep
                     HitTestContext.screenPoint = p;
             }
             HitTestContext.worldPoint = StageCamera.main.ScreenToWorldPoint(HitTestContext.screenPoint);
@@ -686,56 +681,6 @@ namespace FairyGUI
             }
         }
 
-		/// <summary>
-		/// 是否强制合批，跳过默认的打断合批行为：如重叠时、穿插GLoader、GoWrapper时等；
-		/// 适用于大量重复创建的、对重叠检查不敏感的情况（如地图HUD）。
-		/// </summary>
-		public bool forceBatching
-		{
-			get { return (_flags & Flags.ForceBatching) != 0; }
-			set
-			{
-				bool oldValue = (_flags & Flags.ForceBatching) != 0;
-				if (oldValue != value)
-				{
-					if (value)
-						_flags |= Flags.ForceBatching;
-					else
-						_flags &= ~Flags.ForceBatching;
-					if (fairyBatching)
-					{
-						_flags |= Flags.BatchingRequested;
-						InvalidateBatchingState();
-					}
-				}
-			}
-		}
-
-		/// <summary>
-		/// 是否对同一BatchingRoot下的GoWraper进行合批。
-		/// 开启此选项时，GoWraper不应使用cloneMaterial。
-		/// </summary>
-		public bool wrapperBatching
-		{
-			get { return (_flags & Flags.WrapperBatching) != 0; }
-			set
-			{
-				bool oldValue = (_flags & Flags.WrapperBatching) != 0;
-				if (oldValue != value)
-				{
-					if (value)
-						_flags |= Flags.WrapperBatching;
-					else
-						_flags &= ~Flags.WrapperBatching;
-					if (fairyBatching)
-					{
-						_flags |= Flags.BatchingRequested;
-						InvalidateBatchingState();
-					}
-				}
-			}
-		}
-
         internal void UpdateBatchingFlags()
         {
             bool oldValue = (_flags & Flags.BatchingRoot) != 0;
@@ -748,8 +693,8 @@ namespace FairyGUI
             {
                 if (newValue)
                     _flags |= Flags.BatchingRequested;
-                else if (_descendants != null)
-                    _descendants.Clear();
+                else if (_batchElements != null)
+                    _batchElements.Clear();
 
                 InvalidateBatchingState();
             }
@@ -789,7 +734,10 @@ namespace FairyGUI
             for (int i = 0; i < cnt; i++)
             {
                 DisplayObject child = _children[i];
-                child._SetLayerDirect(value);
+                if (child._paintingMode > 0)
+                    child.paintingGraphics.gameObject.layer = value;
+                else
+                    child._SetLayerDirect(value);
                 if ((child is Container) && child._paintingMode == 0)
                     ((Container)child).SetChildrenLayer(value);
             }
@@ -850,7 +798,7 @@ namespace FairyGUI
             else
             {
                 if (_mask != null)
-                    _mask.renderingOrder = context.renderingOrder++;
+                    _mask.SetRenderingOrder(context, false);
 
                 int cnt = _children.Count;
                 for (int i = 0; i < cnt; i++)
@@ -865,7 +813,7 @@ namespace FairyGUI
                     if (child.visible)
                     {
                         if (!(child.graphics != null && child.graphics._maskFlag == 1)) //if not a mask
-                            child.renderingOrder = context.renderingOrder++;
+                            child.SetRenderingOrder(context, false);
 
                         child.Update(context);
                     }
@@ -881,7 +829,7 @@ namespace FairyGUI
             if ((_flags & Flags.FairyBatching) != 0)
             {
                 if (context.batchingDepth == 1)
-                    SetRenderingOrder(context);
+                    SetRenderingOrderAll(context);
                 context.batchingDepth--;
             }
 
@@ -901,38 +849,22 @@ namespace FairyGUI
                 onUpdate();
         }
 
-        private void SetRenderingOrder(UpdateContext context)
+        private void SetRenderingOrderAll(UpdateContext context)
         {
             if ((_flags & Flags.BatchingRequested) != 0)
                 DoFairyBatching();
 
             if (_mask != null)
-                _mask.renderingOrder = context.renderingOrder++;
+                _mask.SetRenderingOrder(context, false);
 
-			bool wrapperBatching = (_flags & Flags.WrapperBatching) != 0;
-			if (_wrapperSortingOrders != null)
-				_wrapperSortingOrders.Clear();
-
-            int cnt = _descendants.Count;
+            int cnt = _batchElements.Count;
             for (int i = 0; i < cnt; i++)
             {
-                DisplayObject child = _descendants[i];
-                if (!(child.graphics != null && child.graphics._maskFlag == 1))
-				{
-					if (wrapperBatching && child is GoWrapper)
-					{
-						if (_wrapperSortingOrders == null)
-							_wrapperSortingOrders = new Dictionary<int, int>();
-						(child as GoWrapper).SetRenderingOrderBatching(context, _wrapperSortingOrders);
-					}
-					else
-					{
-						child.renderingOrder = context.renderingOrder++;
-					}
-				}
+                BatchElement batchElement = _batchElements[i];
+                batchElement.owner.SetRenderingOrder(context, true);
 
-                if ((child._flags & Flags.BatchingRoot) != 0)
-                    ((Container)child).SetRenderingOrder(context);
+                if (batchElement.isRoot)
+                    ((Container)batchElement.owner).SetRenderingOrderAll(context);
             }
 
             if (_mask != null)
@@ -946,30 +878,24 @@ namespace FairyGUI
         {
             _flags &= ~Flags.BatchingRequested;
 
-            if (_descendants == null)
-                _descendants = new List<DisplayObject>();
+            if (_batchElements == null)
+                _batchElements = new List<BatchElement>();
             else
-                _descendants.Clear();
+                _batchElements.Clear();
             CollectChildren(this, false);
 
-			bool forceBatching = this.forceBatching;
-            int cnt = _descendants.Count;
+            int cnt = _batchElements.Count;
 
             int i, j, k, m;
             object curMat, testMat, lastMat;
-            DisplayObject current, test;
-            float[] bound;
-			for (i = 0; i < cnt; ++i)
-			{
-				current = _descendants[i];
-				current._material = current.material; // 预先缓存
-			}
+            BatchElement current, test;
+            float[] bounds;
             for (i = 0; i < cnt; i++)
             {
-                current = _descendants[i];
-                bound = current._batchingBounds;
-                curMat = current._material;
-                if (curMat == null || (current._flags & Flags.SkipBatching) != 0)
+                current = _batchElements[i];
+                bounds = current.bounds;
+                curMat = current.material;
+                if (curMat == null || current.breakBatch)
                     continue;
 
                 k = -1;
@@ -977,11 +903,11 @@ namespace FairyGUI
                 m = i;
                 for (j = i - 1; j >= 0; j--)
                 {
-                    test = _descendants[j];
-                    if ((test._flags & Flags.SkipBatching) != 0 && !forceBatching)
+                    test = _batchElements[j];
+                    if (test.breakBatch)
                         break;
 
-                    testMat = test._material;
+                    testMat = test.material;
                     if (testMat != null)
                     {
                         if (lastMat != testMat)
@@ -991,19 +917,13 @@ namespace FairyGUI
                         }
 
                         if (curMat == testMat)
-						{
-							k = m;
-							break;
-						}
+                            k = m;
                     }
 
-					if (forceBatching) // 强制合批时，不再进行重叠检查
-						continue;
-
-                    if ((bound[0] > test._batchingBounds[0] ? bound[0] : test._batchingBounds[0])
-                        <= (bound[2] < test._batchingBounds[2] ? bound[2] : test._batchingBounds[2])
-                        && (bound[1] > test._batchingBounds[1] ? bound[1] : test._batchingBounds[1])
-                        <= (bound[3] < test._batchingBounds[3] ? bound[3] : test._batchingBounds[3]))
+                    if ((bounds[0] > test.bounds[0] ? bounds[0] : test.bounds[0])
+                        <= (bounds[2] < test.bounds[2] ? bounds[2] : test.bounds[2])
+                        && (bounds[1] > test.bounds[1] ? bounds[1] : test.bounds[1])
+                        <= (bounds[3] < test.bounds[3] ? bounds[3] : test.bounds[3]))
                     {
                         if (k == -1)
                             k = m;
@@ -1012,8 +932,8 @@ namespace FairyGUI
                 }
                 if (k != -1 && i != k)
                 {
-                    _descendants.RemoveAt(i);
-                    _descendants.Insert(k, current);
+                    _batchElements.RemoveAt(i);
+                    _batchElements.Insert(k, current);
                 }
             }
 
@@ -1022,50 +942,38 @@ namespace FairyGUI
 
         private void CollectChildren(Container initiator, bool outlineChanged)
         {
+            EnsureSizeCorrect();
             int count = _children.Count;
             for (int i = 0; i < count; i++)
             {
                 DisplayObject child = _children[i];
-                if (!child.visible)
+                if (!child.visible || child == initiator._mask)
                     continue;
 
-                if (child._batchingBounds == null)
-                    child._batchingBounds = new float[4];
-
-                if (child is Container)
+                bool childOutlineChanged = outlineChanged || (child._flags & Flags.OutlineChanged) != 0;
+                bool isRoot = (child._flags & Flags.BatchingRoot) != 0;
+                BatchElement batchElement = child.AddToBatch(initiator._batchElements, isRoot);
+                if (batchElement != null)
                 {
-                    Container container = (Container)child;
-                    if ((container._flags & Flags.BatchingRoot) != 0)
-                    {
-                        initiator._descendants.Add(container);
-                        if (outlineChanged || (container._flags & Flags.OutlineChanged) != 0)
-                        {
-                            Rect rect = container.GetBounds(initiator);
-                            container._batchingBounds[0] = rect.xMin;
-                            container._batchingBounds[1] = rect.yMin;
-                            container._batchingBounds[2] = rect.xMax;
-                            container._batchingBounds[3] = rect.yMax;
-                        }
-                        if ((container._flags & Flags.BatchingRequested) != 0)
-                            container.DoFairyBatching();
-                    }
-                    else
-                        container.CollectChildren(initiator, outlineChanged || (container._flags & Flags.OutlineChanged) != 0);
-                }
-                else if (child != initiator._mask)
-                {
-                    if (outlineChanged || (child._flags & Flags.OutlineChanged) != 0)
+                    batchElement.isRoot = isRoot;
+                    if (childOutlineChanged)
                     {
                         Rect rect = child.GetBounds(initiator);
-                        child._batchingBounds[0] = rect.xMin;
-                        child._batchingBounds[1] = rect.yMin;
-                        child._batchingBounds[2] = rect.xMax;
-                        child._batchingBounds[3] = rect.yMax;
+                        batchElement.bounds[0] = rect.xMin;
+                        batchElement.bounds[1] = rect.yMin;
+                        batchElement.bounds[2] = rect.xMax;
+                        batchElement.bounds[3] = rect.yMax;
+                        child._flags &= ~Flags.OutlineChanged;
                     }
-                    initiator._descendants.Add(child);
                 }
 
-                child._flags &= ~Flags.OutlineChanged;
+                if (isRoot)
+                {
+                    if ((child._flags & Flags.BatchingRequested) != 0)
+                        ((Container)child).DoFairyBatching();
+                }
+                else if (child is Container)
+                    ((Container)child).CollectChildren(initiator, childOutlineChanged);
             }
         }
 
@@ -1203,5 +1111,29 @@ namespace FairyGUI
             {
             }
         }
+    }
+
+
+    public class BatchElement
+    {
+        public Material material;
+        public float[] bounds;
+        public IBatchable owner;
+        public bool isRoot;
+        public bool breakBatch;
+
+        public BatchElement(IBatchable owner, float[] bounds)
+        {
+            this.owner = owner;
+            this.bounds = bounds ?? new float[4];
+        }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public interface IBatchable
+    {
+        void SetRenderingOrder(UpdateContext context, bool inBatch);
     }
 }
