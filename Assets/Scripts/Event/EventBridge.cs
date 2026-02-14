@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 #if FAIRYGUI_TOLUA
 using System;
 using LuaInterface;
@@ -14,6 +15,10 @@ namespace FairyGUI
 
         EventCallback0 _callback0;
         EventCallback1 _callback1;
+        #region 对UniTask的支持
+        EventCallbackAsync _callbackAsync0;
+        EventCallbackAsync1 _callbackAsync1;
+        #endregion
         EventCallback1 _captureCallback;
         internal bool _dispatching;
 
@@ -49,6 +54,31 @@ namespace FairyGUI
             _callback0 -= callback;
             _callback0 += callback;
         }
+
+        #region 对UniTask的支持
+
+        public void Add(EventCallbackAsync1 callback)
+        {
+            _callbackAsync1 -= callback;
+            _callbackAsync1 += callback;
+        }
+
+        public void Remove(EventCallbackAsync1 callback)
+        {
+            _callbackAsync1 -= callback;
+        }
+        public void Add(EventCallbackAsync callback)
+        {
+            _callbackAsync0 -= callback;
+            _callbackAsync0 += callback;
+        }
+
+        public void Remove(EventCallbackAsync callback)
+        {
+            _callbackAsync0 -= callback;
+        }
+        
+        #endregion
 
         public void Remove(EventCallback0 callback)
         {
@@ -112,7 +142,7 @@ namespace FairyGUI
 
         public bool isEmpty
         {
-            get { return _callback1 == null && _callback0 == null && _captureCallback == null; }
+            get { return _callback1 == null && _callback0 == null &&_callbackAsync1 == null && _callbackAsync0 == null && _captureCallback == null; }
         }
 
         public void Clear()
@@ -136,6 +166,10 @@ namespace FairyGUI
 #endif
             _callback1 = null;
             _callback0 = null;
+            #region 对UniTask的支持
+            _callbackAsync0 = null;
+            _callbackAsync1 = null;
+            #endregion
             _captureCallback = null;
         }
 
@@ -149,6 +183,12 @@ namespace FairyGUI
                     _callback1(context);
                 if (_callback0 != null)
                     _callback0();
+                #region 对UniTask的支持
+                if (_callbackAsync1 != null)
+                    _callbackAsync1(context).BreakBy(this.owner);
+                if (_callbackAsync0 != null)
+                    _callbackAsync0().BreakBy(this.owner);
+                #endregion
             }
             finally
             {

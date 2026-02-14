@@ -355,6 +355,12 @@ namespace FairyGUI
             _paramData = param;
             return this;
         }
+        
+        public GTweener OnComplete(GTweenCallbackParameter callback)
+        {
+            OnComplete(callback, null);
+            return this;
+        }
 
         /// <summary>
         /// 

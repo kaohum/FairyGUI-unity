@@ -296,7 +296,7 @@ namespace FairyGUI
             get => mVFXLoadCompleteAction;
             set
             {
-                if (m_handle != null && m_handle.IsComplete)
+                if (m_handle != null && m_handle.IsValid)
                 {
                     value?.Invoke(m_handle);
                     return;
@@ -389,7 +389,7 @@ namespace FairyGUI
                 {
                     if (m_handle.Params == vfx_id)
                     {
-                        if (m_handle.IsComplete)
+                        if (m_handle.IsValid)
                         {
                             var animation = m_handle.gameObject.GetComponent<CAnimation>();
                             if (animation != null)

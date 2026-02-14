@@ -26,7 +26,7 @@ namespace FairyGUI
         /// </summary>
         public ScrollPane scrollPane { get; private set; }
 
-        internal List<GObject> _children;
+        public List<GObject> _children;
         internal List<Controller> _controllers;
         internal List<Transition> _transitions;
         internal bool _buildingDisplayList;

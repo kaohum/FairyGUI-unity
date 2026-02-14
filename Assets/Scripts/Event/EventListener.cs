@@ -57,7 +57,25 @@ namespace FairyGUI
         /// 
         /// </summary>
         /// <param name="callback"></param>
+        public void Add(EventCallbackAsync1 callback)
+        {
+            _bridge.Add(callback);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="callback"></param>
         public void Remove(EventCallback1 callback)
+        {
+            _bridge.Remove(callback);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="callback"></param>
+        public void Remove(EventCallbackAsync1 callback)
         {
             _bridge.Remove(callback);
         }
@@ -73,6 +91,11 @@ namespace FairyGUI
         {
             _bridge.Add(callback);
         }
+        
+        public void Add(EventCallbackAsync callback)
+        {
+            _bridge.Add(callback);
+        }
 
         /// <summary>
         /// 
@@ -82,6 +105,11 @@ namespace FairyGUI
         [NoToLua]
 #endif
         public void Remove(EventCallback0 callback)
+        {
+            _bridge.Remove(callback);
+        }
+        
+        public void Remove(EventCallbackAsync callback)
         {
             _bridge.Remove(callback);
         }

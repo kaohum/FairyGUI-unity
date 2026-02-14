@@ -1,15 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 
 namespace FairyGUI
 {
     public delegate void EventCallback0();
     public delegate void EventCallback1(EventContext context);
 
+    #region 对UniTask的支持
+
+    public delegate UniTask EventCallbackAsync();
+    public delegate UniTask EventCallbackAsync1(EventContext context);
+
+    #endregion
+
     /// <summary>
     /// 
     /// </summary>
-    public class EventDispatcher : IEventDispatcher
+    public class EventDispatcher : IEventDispatcher, IAsyncContext
     {
         Dictionary<string, EventBridge> _dic;
 
@@ -511,5 +519,28 @@ namespace FairyGUI
                 }
             }
         }
+
+        #region 对UniTask的支持
+
+        /// <summary>
+        /// UniTask的异步打断器
+        /// </summary>
+        public IUniTaskBreakableContext AsyncContext
+        {
+            get
+            {
+                if (mContext == null)
+                {
+                    mContext = new UniTaskBreakableContext();
+                }
+
+                return mContext;
+            }
+        }
+
+        protected IUniTaskBreakableContext mContext;
+
+        #endregion
+
     }
 }

@@ -1762,6 +1762,16 @@ namespace FairyGUI
                 displayObject.Dispose();
             }
             data = null;
+
+            #region UniTask的支持
+
+            if (this.mContext != null)
+            {
+                // 打断所有异步
+                this.mContext.Break();
+            }
+
+            #endregion
         }
 
         /// <summary>

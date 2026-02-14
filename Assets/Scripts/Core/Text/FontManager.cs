@@ -68,7 +68,7 @@ namespace FairyGUI
             //Try to use new API in Uinty5 to load
             if (asset == null)
             {
-                if (name.IndexOf(",") != -1)
+                if (name.IndexOf(",", StringComparison.Ordinal) != -1)
                 {
                     string[] arr = name.Split(',');
                     int cnt = arr.Length;

@@ -18,22 +18,17 @@ namespace FairyGUI
             DisplayObjectPool<SelectionShape>.TryCreateInstance(32);
         }
 
-        public static async UniTask CreatePoolObjects(Action<float> progress)
+        public static async UniTask CreatePoolObjects()
         {
-            progress?.Invoke(0.00f);
             DisplayObjectPool<Container>.Instance.InitPool(false);
-            progress?.Invoke(0.38f);
             await UniTask.DelayFrame(1);
             DisplayObjectPool<Image>.Instance.InitPool(true);
-            progress?.Invoke(0.76f);
             await UniTask.DelayFrame(1);
             DisplayObjectPool<TextField>.Instance.InitPool(true);
-            progress?.Invoke(0.90f);
             await UniTask.DelayFrame(1);
             DisplayObjectPool<GoWrapper>.Instance.InitPool(false);
             DisplayObjectPool<Shape>.Instance.InitPool(true);
             DisplayObjectPool<SelectionShape>.Instance.InitPool(true);
-            progress?.Invoke(1.00f);
             await UniTask.DelayFrame(1);
         }
     }
